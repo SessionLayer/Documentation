@@ -147,19 +147,28 @@ open:
 | `exec` | yes (when omitted) | single commands |
 | `sftp` | no | SFTP subsystem |
 | `scp` | no | legacy `scp` over exec |
-| `port_forward_local` | no | `-L` forwards |
-| `port_forward_remote` | no | `-R` forwards |
-| `agent_forward` | no | **never admitted** — see below |
-| `x11` | no | X11 forwarding |
+| `port_forward_local` | no | accepted in policy, **not admitted by the Gateway in this release** — `-L` channels are always refused |
+| `port_forward_remote` | no | accepted in policy, **not admitted in this release** — `-R` requests are always refused |
+| `agent_forward` | no | **never admitted, by design** — see below |
+| `x11` | no | accepted in policy, **not admitted in this release** — X11 requests are always refused |
 
-A rule that omits `capabilities` grants `shell` + `exec` only. A withheld
-capability produces a clear channel-level refusal, not a generic denial —
-by then the user is already authorized, so there is nothing to hide.
+A rule that omits `capabilities` grants `shell` + `exec` only. For the
+enforced capabilities (`shell`, `exec`, `sftp`, `scp`), a withheld capability
+produces a clear channel-level refusal, not a generic denial — by then the
+user is already authorized, so there is nothing to hide.
+
+> **Note:** the three forwarding-adjacent capabilities marked "not admitted"
+> exist end-to-end in the policy vocabulary — rules storing them validate and
+> sign fine — but the Gateway's data plane refuses those channel types
+> unconditionally in this release, so granting them changes nothing yet.
+> Vocabulary reserved ahead of implementation, stated here so you don't debug
+> a "granted" forward that can never work.
 
 > **Warning:** the Gateway refuses SSH agent forwarding on every path,
-> including ProxyJump, regardless of any `agent_forward` grant. Forwarding
-> your agent to a Tier-0 intercepting proxy would hand it signing access to
-> your private keys; the platform declines to be trusted that far.
+> including ProxyJump, regardless of any `agent_forward` grant — and unlike
+> the reserved capabilities above, this refusal is deliberate and permanent.
+> Forwarding your agent to a Tier-0 intercepting proxy would hand it signing
+> access to your private keys; the platform declines to be trusted that far.
 
 ## Platform RBAC
 

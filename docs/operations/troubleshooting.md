@@ -16,7 +16,7 @@ The error taxonomy in one table:
 | standard SSH authentication failure | all auth methods exhausted | generic |
 | `access denied by policy` | authorized-but-denied: rule, lock, quarantine, session limit, or no matching allow | **one generic message for all of them** |
 | `authentication timed out, please reconnect` | device flow not approved in time | specific |
-| `target node is offline / unreachable` | post-authorization: the node can't be reached | specific (the user is entitled to know the target exists) |
+| `the target node is offline or unavailable` | post-authorization: the node can't be reached | specific (the user is entitled to know the target exists) |
 | `session cannot start: recording unavailable` | strict recording (always, for break-glass) couldn't start | specific |
 | `service temporarily unavailable` | Control Plane unreachable — new sessions fail closed | specific |
 
@@ -81,7 +81,7 @@ allow matched. The checklist, roughly in observed frequency order:
   every ~10 s during IdP polling; a middlebox with a very aggressive idle
   timeout can still cut it. Check the path's idle limits.
 
-## "Target node is offline / unreachable"
+## "The target node is offline or unavailable"
 
 The user was *authorized* — this is reachability. For an *agentless* node:
 can the Gateway reach `node:22` (routing, firewall, the NetworkPolicy's
@@ -130,17 +130,20 @@ is down, the symptom is the same for new sessions:
 Check the session's `endReason` (`GET /v1/sessions/{id}`) and the audit
 stream: a pushed lock (incident response, quarantine, JIT revoke), grant
 expiry per the access model's mode (run-to-TTL / grace-then-kill /
-hard-kill), an idle timeout (`IDLE_TIMEOUT` — activity-tracked, per
+hard-kill), an idle timeout (`idle_timeout` — activity-tracked, per
 [Session limits](../admin-guides/session-limits.md)), a Gateway drain
 deadline during maintenance ([Upgrades](upgrades.md)), or a mid-session
-recording failure under strict mode.
+recording failure under strict mode. The `endReason` vocabulary is
+`expired`, `idle_timeout`, `locked`, `error`, and `closed`.
 
 ## A channel is refused inside a working session
 
-`sftp`/`scp`/port-forward refusals with an explicit channel error mean the
-capability wasn't granted — by then you're authorized, so the error is
-allowed to be specific ([RBAC](../admin-guides/rbac.md)). Agent forwarding
-is refused always, everywhere, by design. With `ControlMaster` multiplexing,
+`sftp`/`scp` refusals with an explicit channel error mean the capability
+wasn't granted — by then you're authorized, so the error is allowed to be
+specific ([RBAC](../admin-guides/rbac.md)). Port forwarding and X11 channels
+are refused by the Gateway in this release regardless of policy, and agent
+forwarding is refused always, everywhere, by design — granting those
+capabilities does not stop the refusal. With `ControlMaster` multiplexing,
 each new channel re-checks capability/expiry/locks locally — a channel
 refusal in a long-lived master connection often means policy changed under
 it.

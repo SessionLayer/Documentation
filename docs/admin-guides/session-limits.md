@@ -80,17 +80,23 @@ Accounting is exact: a lease is released promptly on every teardown path,
 including degraded sessions that never recorded, and a session that crashes
 without a goodbye self-heals its slot at grant expiry.
 
-**Max session duration** is folded into the decision's grant expiry
-(`min(policy value, cluster default, the grant's own TTL)`) and enforced by
-the Gateway's mid-session expiry machinery — run-to-TTL, grace-then-kill, or
-hard-kill per access model, with a [lock](locks.md) always overriding.
+**Max session duration** is folded into the decision's grant expiry:
+`min(resolved ceiling, the grant's own TTL)`, where the resolved ceiling is
+the most restrictive value across the *matching per-identity policies*,
+falling back to the cluster default only when no matching policy sets the
+knob. A per-identity policy can therefore be **looser** than the cluster
+default for its population — the default is a fallback, not a fleet-wide
+ceiling. The Gateway's mid-session expiry machinery enforces the result —
+run-to-TTL, grace-then-kill, or hard-kill per access model, with a
+[lock](locks.md) always overriding.
 
-**Idle timeout** is signed into the decision context and applied by the
-Gateway as the session's inactivity bound, **tighten-only**: the Gateway has
-its own static idle ceiling, and the signed per-identity value can shorten it
-but never extend it. Real activity (client keystrokes reaching a live
-channel) resets the clock; an idle session is torn down with reason
-`IDLE_TIMEOUT`.
+**Idle timeout** resolves the same way (matching policies first, the cluster
+default only as the fallback), is signed into the decision context, and is
+applied by the Gateway as the session's inactivity bound **tighten-only
+against the Gateway's own static idle ceiling**: the signed value can shorten
+that static bound, never extend it. Real activity (client keystrokes reaching
+a live channel) resets the clock; an idle session is torn down with end
+reason `idle_timeout`.
 
 **Break-glass is exempt from all three.** An emergency session is never
 refused because an on-call operator already has three windows open —
