@@ -16,7 +16,7 @@ The split by component:
 
 | Component | Metrics | Traces |
 |---|---|---|
-| Control Plane | `/actuator/prometheus` (exposed by default alongside `health`, `info`, `metrics`) | OTLP, off by default; enable via `management.otlp.tracing.endpoint` (the `OTEL_EXPORTER_OTLP_ENDPOINT` convention maps to it) |
+| Control Plane | `/actuator/prometheus` (exposed by default alongside `health`, `info`, `metrics`) | OTLP, off by default; enable by setting both `management.otlp.tracing.export.enabled=true` and `management.otlp.tracing.endpoint` (service name via `management.opentelemetry.resource-attributes.service.name`, default `sessionlayer-controlplane`; sampling via `management.tracing.sampling.probability`) |
 | Gateway | none (span-derived) | OTLP, on only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; service name `sessionlayer-gateway` (`OTEL_SERVICE_NAME` overrides) |
 | Agent | none (span-derived) | Same convention; service name `sessionlayer-agent` |
 
