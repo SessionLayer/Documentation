@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Documentation
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # Drift checks diff the references against the product source of truth.
+      - name: Checkout ControlPlane-API (source of truth)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: SessionLayer/ControlPlane-API
+          ref: main
+          path: product/ControlPlane-API
+
+      - name: Checkout Gateway (source of truth)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: SessionLayer/Gateway
+          ref: main
+          path: product/Gateway
+
+      - name: Checkout Agent (source of truth)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: SessionLayer/Agent
+          ref: main
+          path: product/Agent
+
+      - name: markdownlint
+        run: npm exec --yes -- markdownlint-cli2@0.18.1
+
+      - name: Nav completeness (SUMMARY.md vs tree)
+        run: ./scripts/check-summary.sh
+
+      - name: Internal links and anchors
+        run: ./scripts/check-links.sh
+
+      - name: API reference drift (both directions)
+        run: ./scripts/check-api-drift.sh product/ControlPlane-API
+
+      - name: Config reference drift (both directions)
+        run: ./scripts/check-config-drift.sh product
+
+      # External links flake; check them without gating the merge on them.
+      - name: External links (non-blocking)
+        continue-on-error: true
+        run: ./scripts/check-links.sh --external
