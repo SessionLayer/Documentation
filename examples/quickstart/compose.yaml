@@ -1,0 +1,149 @@
+# SessionLayer single-host evaluation stack (see docs/getting-started/quickstart.md).
+#
+# Everything runs in containers on one Compose network: Postgres, MinIO (the WORM
+# recording store), the Control Plane (built from source), the Gateway (built via
+# the product's own deploy/Dockerfile), one node, and a stock OpenSSH client so
+# the guide never touches your host SSH setup. The Control Plane and Gateway are
+# built from the public GitHub repositories, so you only clone the Documentation
+# repository.
+#
+# Every credential in this file is a DEV-ONLY placeholder for a throwaway
+# evaluation. All published ports bind to 127.0.0.1 only.
+name: sessionlayer-quickstart
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: sessionlayer
+      POSTGRES_PASSWORD: sessionlayer
+      POSTGRES_DB: sessionlayer
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./pg-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sessionlayer -d sessionlayer"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-08T15-41-24Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: sessionlayer
+      MINIO_ROOT_PASSWORD: sessionlayer-dev-secret
+    # Published so the replay signed URL is fetchable from your machine
+    # (the URL names the in-network host `minio`; the guide maps it with
+    # `curl --connect-to`).
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  controlplane:
+    build:
+      context: .
+      dockerfile: cp.Dockerfile
+      additional_contexts:
+        src: https://github.com/SessionLayer/ControlPlane-API.git#main
+    environment:
+      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/sessionlayer
+      SPRING_R2DBC_USERNAME: sessionlayer
+      SPRING_R2DBC_PASSWORD: sessionlayer
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/sessionlayer
+      SPRING_FLYWAY_USER: sessionlayer
+      SPRING_FLYWAY_PASSWORD: sessionlayer
+      # Dev-only: lets the local CA backend run with a built-in KEK. Production
+      # uses a KMS/Key Vault/Vault-backed CA or a real KEK (see the hardening guide).
+      SESSIONLAYER_CA_LOCAL_ALLOW_DEV_KEK: "true"
+      SESSIONLAYER_MTLS_SERVER_PORT: "9443"
+      SESSIONLAYER_RECORDING_WORM_ENDPOINT: http://minio:9000
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    # Generous start window: first boot runs all migrations and generates the CAs.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/v1/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 90s
+
+  # One-shot provisioning that has no public API surface: extracts the two CA
+  # trust anchors, mints the Gateway's enrollment token, creates the admin
+  # service account, and installs the customer recording key (public half only).
+  # Everything else in the guide uses the real REST API. Idempotent across
+  # re-runs of `docker compose up`.
+  seed:
+    build: ./seed
+    volumes:
+      - state:/state
+      - gw-data:/gw-data
+    depends_on:
+      controlplane:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: https://github.com/SessionLayer/Gateway.git#main
+      dockerfile: deploy/Dockerfile
+    command: ["--config", "/state/gateway.json"]
+    hostname: gw
+    ports:
+      - "127.0.0.1:2222:2222"
+    volumes:
+      - state:/state:ro
+      - gw-data:/var/lib/sessionlayer-gateway
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      controlplane:
+        condition: service_healthy
+    restart: on-failure:3
+
+  web-01:
+    build: ./node
+    hostname: web-01
+    volumes:
+      - state:/state:ro
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  client:
+    build: ./client
+    # Read access to /state gives the client the host-CA public key for the
+    # ProxyJump `@cert-authority` demo in the SSH access guide.
+    volumes:
+      - state:/state:ro
+    depends_on:
+      gateway:
+        condition: service_started
+
+  # Offline SLREC1 decryptor (docs/user-guide has the format background). Run on
+  # demand: docker compose run --rm -T decrypt <object> > session.cast
+  decrypt:
+    profiles: [tools]
+    build: ./tools
+    volumes:
+      - state:/state:ro
+      - .:/work
+    working_dir: /work
+
+volumes:
+  pgdata: {}
+  miniodata: {}
+  state: {}
+  gw-data: {}
