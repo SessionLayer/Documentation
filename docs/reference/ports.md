@@ -52,13 +52,18 @@ implied or optional-but-undocumented.
 
 - **Nodes running an Agent need no inbound rules at all.** The Agent dials out to Gateways; sessions
   arrive over that outbound channel and splice to loopback `sshd`.
-- **Agentless nodes** need inbound `22` from the Gateways only.
+- **Agentless nodes** need inbound `22` from the Gateways — plus, if you rely on native SSH (rather
+  than console/serial) as your platform-independent recovery path (see the
+  [FAQ](../faq.md) and [Break-glass access](../admin-guides/break-glass.md)), from your
+  admin/recovery network.
 - **The Gateway** accepts SSH from users and the agent transport from Agents/peer Gateways; it dials
   the Control Plane, nodes, the object store, and (in HA with NATS) the signal bus.
 - **The Control Plane** accepts REST (`8080`) and gRPC (`9090` default) only; it dials Postgres, the
   object store, Vault, and your IdP. Restrict its egress to exactly those (see
   [Production hardening](../security/hardening.md)).
-- Users never reach a node directly — only through a Gateway.
+- Sessions through the platform always transit a Gateway — users hold no platform credential that
+  reaches a node directly. Whether operators keep a direct native-SSH path open besides is the
+  recovery trade-off above.
 
 ## Next
 

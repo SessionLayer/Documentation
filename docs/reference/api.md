@@ -99,7 +99,9 @@ credentials, recordings, audit events) reflect live state and carry neither.
 Three enums appear throughout:
 
 - **Capabilities** (what a session may do): `shell`, `exec`, `sftp`, `scp`, `port_forward_local`,
-  `port_forward_remote`, `agent_forward`, `x11`.
+  `port_forward_remote`, `agent_forward`, `x11`. The last four are policy vocabulary only in this
+  release: the Gateway refuses port-forward and X11 channels even when granted, and agent
+  forwarding is never admitted, by design (see [RBAC](../admin-guides/rbac.md)).
 - **Platform permissions** (what an admin may call): `rbac:read`, `rbac:write`, `node:enroll`,
   `node:quarantine`, `node:remove`, `ca:manage`, `ca:rotate`, `request:approve`, `recording:replay`,
   `recording:export`, `recording:delete`, `audit:read`, `user:manage`, `settings:write`, `lock:read`,
