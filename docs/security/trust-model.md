@@ -227,13 +227,13 @@ findings there).
 | `F-eku-enforcement-1`, `F-access-accepted-risk-1` (CP) | info | consolidated reviewer-confirmation notes (EKU enforcement confirmed; S13 design decisions recorded so they aren't re-flagged) |
 | `F-recorder-frame-count-1` (GW) | low | the recording cipher binds each frame's index but not the total count — trailing-frame truncation of a *stolen ciphertext* decrypts cleanly; the CP-held whole-object digest and WORM catch it on the record of truth |
 | `F-gw-breakglass-secret-zeroize-1` (GW) | med | break-glass offline codes and tokens transit the Gateway heap in non-zeroized copies (unlike recorder and inner-key material, which is scrubbed); coredumps-off and no-swap are the compensating controls |
-| `F-snapshot-empty-retention-1` (GW) | med | a datastore substitution that serves a successfully-read but *empty* lock snapshot on reconnect would shrink a Gateway's deny-set — the feed's epoch signal is advisory, not authoritative |
+| `F-snapshot-empty-retention-1` (GW) | med | a datastore substitution that serves a successfully-read but *empty* lock snapshot on reconnect would shrink a Gateway's deny-set — the feed's epoch signal is advisory, not authoritative (listed per the register; its exact currency against later feed hardening was not fully re-verified) |
 | `F-dep-1` (GW) | med (practically low) | the `rsa` crate remains in the lockfile as an uncompiled optional dependency (RUSTSEC-2023-0071 scanner noise; never built into the binary) |
 | `F-otp-transit-1` (GW) | low | OTPs are zeroized in the Gateway's handler, but the gRPC serialization buffers that carried them are not |
 | `F-sshkey-dup-1` (GW) | low | two versions of the `ssh-key` crate coexist (the SSH library's boundary vs the platform's own use) |
 | `F-lockfeed-fleet-scale-1` (GW) | low | lock-feed reconnects have no jitter and a fleet-wide lock's teardown fans out synchronously — at very large fleets this can herd |
 | `F-pty-wantreply-1` (GW) | low | the inner-leg PTY request doesn't ask for a reply, so a node-side PTY allocation failure is silently swallowed rather than surfaced |
-| `F-gendesync-1` (GW) | low | a latent busy-renew path in Gateway identity renewal could desync the generation counter; it surfaces fail-closed as a repair-needed lock |
+| `F-gendesync-1` (GW) | low | a latent busy-renew path in Gateway identity renewal could desync the generation counter; it surfaces fail-closed as a repair-needed lock (listed per the register; its exact currency against later renew hardening was not fully re-verified) |
 | `F-cert-local-validation-1` (GW) | low | by-design note: the SSH library locally checks certificate expiry and self-signature ahead of the Control Plane's authoritative checks |
 | `F-gw-breakglass-accepted-notes-1` (GW) | low | consolidated break-glass review notes (metrics, fan-out, attestation, disambiguation) recorded so they aren't re-flagged |
 | `F-proxy-maxaddr-1` (GW) | info | the PROXY v2 parser caps the address block at a fixed size |

@@ -73,6 +73,12 @@ psql "$CP_DATABASE_URL" -c "SET ROLE cp_runtime; DELETE FROM runtime.audit_event
 # expect: ERROR:  permission denied for table audit_event
 ```
 
+The same logic extends above the application role: restrict who holds actual
+Postgres **superuser** on this cluster — the audit trail's non-repudiation
+depth assumes both the app's role *and* casual superuser access are
+constrained, because a superuser can defeat the append-only trigger (the
+Merkle-deferral risk in the [trust model](trust-model.md)).
+
 Authorization and audit writes are the platform's record of truth, so run
 Postgres HA with **synchronous replication** covering them — an async-only
 setup can acknowledge an authorization or an audit row and then lose it in a

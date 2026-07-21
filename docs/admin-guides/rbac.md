@@ -164,6 +164,8 @@ user is already authorized, so there is nothing to hide.
 > Vocabulary reserved ahead of implementation, stated here so you don't debug
 > a "granted" forward that can never work.
 
+Agent forwarding is a different case entirely:
+
 > **Warning:** the Gateway refuses SSH agent forwarding on every path,
 > including ProxyJump, regardless of any `agent_forward` grant — and unlike
 > the reserved capabilities above, this refusal is deliberate and permanent.
