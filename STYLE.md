@@ -80,7 +80,8 @@ Define once in [Core concepts](docs/getting-started/concepts.md) and the
 | data-plane RBAC | who may SSH where | "SSH RBAC" |
 | platform RBAC | who may administer SessionLayer | "admin RBAC" |
 | session CA / user CA / host CA | the three certificate authorities | "the CA" without qualifying |
-| join token | the single-use agent/gateway enrollment credential | "enrollment key" |
+| join token | the single-use credential an Agent presents to enroll | "enrollment key" |
+| enrollment token | the Gateway's equivalent of the join token (matches the `bootstrap.enrollment_token` config key) | "join token" for a Gateway |
 | customer recording key | the operator-held key recordings are sealed to | "encryption key" unqualified |
 
 Component names are capitalized (Gateway, Agent, Control Plane); generic nouns

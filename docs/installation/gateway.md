@@ -4,8 +4,8 @@ When you finish this page you have an enrolled Gateway: it holds a renewable
 mTLS identity issued by the Control Plane, listens for SSH, and is ready to
 broker sessions to nodes.
 
-The Gateway is the platform's **Tier-0** component — the only process that ever
-sees SSH session plaintext. Treat its placement accordingly: dedicated hosts or
+The Gateway is the platform's [**Tier-0**](../reference/glossary.md) component —
+the only process that ever sees SSH session plaintext. Treat its placement accordingly: dedicated hosts or
 a dedicated namespace, minimal operator access, and the hardened profile below
 switched on. The [trust model](../security/trust-model.md) explains why this
 one component carries the blast radius.
@@ -69,7 +69,8 @@ recorder, HA, hardening) is in the
 ## Enroll it (one-time trust bootstrap)
 
 A Gateway proves itself to the Control Plane once, with an operator-provisioned
-single-use enrollment token; from then on it holds a CP-issued renewable mTLS
+single-use enrollment token (the Gateway's equivalent of an Agent's join
+token); from then on it holds a CP-issued renewable mTLS
 identity with a generation counter, and it is a first-class, lockable
 principal. Two operator steps, both against the Control Plane's database
 (gateway enrollment deliberately has no REST endpoint — it is the trust
@@ -142,9 +143,9 @@ which degrades with a loud warning.
 
 ## Give it an address users can reach
 
-Decide how users name nodes — wildcard DNS (`ssh alice@web-01.ssh.example.com`
+Decide how users name nodes — wildcard DNS (`ssh deploy@web-01.ssh.example.com`
 with a `*.ssh.example.com` record pointing at the Gateway), username encoding
-(`ssh 'alice%web-01'@gw.example.com`), or ProxyJump — and set the matching
+(`ssh 'deploy%web-01'@gw.example.com`), or ProxyJump — and set the matching
 config (`ssh.node_dns_suffixes`, `ssh.target_separator`, `ssh.proxy_jump`).
 Details and the exact client experience are in
 [SSH access](../user-guide/ssh-access.md) and
@@ -157,7 +158,7 @@ header from the LB is rejected too (fail closed both ways).
 ## Verify
 
 ```bash
-ssh -p 2222 alice@gw.example.com
+ssh -p 2222 'deploy%web-01'@gw.example.com
 ```
 
 Before any access rules exist you get a generic authentication failure — that

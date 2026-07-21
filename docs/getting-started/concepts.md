@@ -153,7 +153,7 @@ does and does not protect against.
 | recording | the sealed asciicast of a session |
 | lease | a live session's slot against a session limit |
 | session CA / user CA / host CA | the three certificate authorities, per the table above |
-| join token | the single-use credential that enrolls an Agent or Gateway |
+| join token | the single-use credential that enrolls an Agent (a Gateway's equivalent is its enrollment token) |
 | customer recording key | the operator-held key recordings are sealed to |
 | data-plane RBAC / platform RBAC | who may SSH where / who may administer SessionLayer |
 

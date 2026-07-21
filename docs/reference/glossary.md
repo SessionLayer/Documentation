@@ -66,7 +66,8 @@ in context; every other page uses them consistently.
   a 0–3 level approval chain decides; the grant is time-boxed and revocable. Self-approval is
   impossible.
 - **join token** — the single-use, short-TTL, node-scoped credential an Agent presents to enroll.
-  Shown once at issuance; only its hash is stored.
+  Shown once at issuance; only its hash is stored. The Gateway's equivalent is its **enrollment
+  token**, provisioned by the operator (config key `bootstrap.enrollment_token`).
 - **lease** — a live session's slot against a concurrency limit. Leases are extended while the
   session runs, released at session end, and swept by a reaper if a Gateway dies without reporting.
 - **lock** — the un-overridable deny primitive: it blocks new sessions matching its target and tears
@@ -110,6 +111,9 @@ in context; every other page uses them consistently.
   to the customer recording key (ECIES P-256), so only the key holder can decrypt.
 - **standing access** — the access model backed by a durable data-plane rule: no request or
   approval, just policy that persists until changed.
+- **Tier-0** — the platform's fully-trusted component class: the Gateway (the one process that
+  sees session plaintext) and the certificate authorities. Zero trust relocates trust here rather
+  than eliminating it; Tier-0 is why the [hardening checklist](../security/hardening.md) exists.
 - **user CA** — the certificate authority that signs user SSH certificates, letting users
   authenticate to the Gateway with short-lived certificates instead of long-lived keys.
 - **WORM** — write-once-read-many object storage (S3 object lock): recordings land in a bucket

@@ -84,7 +84,7 @@ certificate TTL has elapsed, jittered to de-synchronise a fleet.
 | `ssh.max_auth_attempts` | int | `6` | Per-connection cap on credential-resolution attempts (each is one Control Plane RPC). After the cap the connection is hard-rejected. |
 | `ssh.source_ip_allowlist` | list of CIDR | empty (allow all) | Global source-IP gate, evaluated at TCP accept against the real client IP, before any SSH banner. Non-empty drops any source outside it. |
 | `ssh.target_separator` | char | `%` | The username-encoding separator (`login%node`). |
-| `ssh.node_dns_suffixes` | list | empty (off) | Wildcard-DNS domains: a matching suffix is stripped from the username's node half (`alice%web-01.ssh.example.com` → `web-01`). Longest match wins; case-insensitive. |
+| `ssh.node_dns_suffixes` | list | empty (off) | Wildcard-DNS domains: a matching suffix is stripped from the username's node half (`deploy%web-01.ssh.example.com` → `web-01`). Longest match wins; case-insensitive. |
 | `ssh.cp_connect_timeout_secs` | int (s) | `5` | Bound on establishing the Control Plane mTLS transport for an auth/authorize RPC. |
 | `ssh.cp_rpc_timeout_secs` | int (s) | `10` | Per-RPC deadline on every auth/authorize call; a hung Control Plane never hangs the SSH handshake. |
 

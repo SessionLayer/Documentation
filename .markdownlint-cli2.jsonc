@@ -1,5 +1,5 @@
 {
-  // Rule choices are documented in Docs/sessions/twentysix/RESULT.md §7.
+  // Deviations from the defaults, each with its reason inline below.
   "config": {
     "default": true,
     // Prose wraps naturally; long link/table lines are not defects.
