@@ -12,5 +12,7 @@
     "MD036": false
   },
   "globs": ["**/*.md"],
-  "ignores": ["node_modules/**", "product/**"]
+  // audit/ holds the findings-workflow files (quoted doc snippets, not reader
+  // pages) — same reason the link checker skips them.
+  "ignores": ["node_modules/**", "product/**", "audit/**"]
 }
