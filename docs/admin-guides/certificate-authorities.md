@@ -5,6 +5,11 @@ this guide explains the authorities that make that work: the **three SSH CAs**
 (user, session, host), the internal X.509 CA behind the component mesh, the
 supported key backends, and how to rotate a CA without fleet downtime.
 
+## Prerequisites
+
+- [ ] the `ca:manage` platform permission (`ca:rotate` for rotation)
+- [ ] an admin bearer token in `$TOKEN` — see [Authentication](authentication.md)
+
 ## The three SSH CAs, and why there are three
 
 | CA | Signs | Who trusts it |

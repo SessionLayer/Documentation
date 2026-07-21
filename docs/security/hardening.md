@@ -66,7 +66,10 @@ spring.r2dbc.password=use-a-generated-secret-here
 
 Rotate later out-of-band: `ALTER ROLE cp_runtime PASSWORD '...'` as the DB
 owner, plus a rolling restart with the updated `spring.r2dbc.password`.
-Verify the restriction actually holds:
+Verify the restriction actually holds (`$CP_DATABASE_URL` is an owner-role
+Postgres connection string for the Control Plane's database; `$TOKEN`, used
+below, is an admin bearer — see
+[Authentication](../admin-guides/authentication.md)):
 
 ```bash
 psql "$CP_DATABASE_URL" -c "SET ROLE cp_runtime; DELETE FROM runtime.audit_event WHERE false;"

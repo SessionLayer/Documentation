@@ -118,7 +118,9 @@ restart loop cannot clear a clone lock. The full reason catalog is in the
 
 ## Verify the join
 
-The node appears in the inventory once its Agent holds control channels:
+The node appears in the inventory once its Agent holds control channels.
+`$TOKEN` is an admin bearer token — see
+[Authentication](../admin-guides/authentication.md):
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" https://cp.example.com/v1/nodes | jq '.nodes[] | {name, status, health}'

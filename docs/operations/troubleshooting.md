@@ -38,7 +38,8 @@ Two causes:
 ## "Access denied by policy" — and the user swears they should have access
 
 The message is identical for every denial reason on purpose. Don't guess —
-read the decision:
+read the decision (`$TOKEN` is an admin bearer — see
+[Authentication](../admin-guides/authentication.md)):
 
 ```bash
 curl -s -G https://cp.example.com/v1/audit-events \

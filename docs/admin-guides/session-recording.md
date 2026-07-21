@@ -124,6 +124,7 @@ session, when" is one query away, in the same stream as the session itself.
 
 ```bash
 # RECORDING_ID from GET /v1/recordings (filter by sessionId, identity, or nodeId).
+# $TOKEN is an admin bearer — see Authentication.
 curl -s -X POST https://cp.example.com/v1/recordings/$RECORDING_ID/export \
   -H "Authorization: Bearer $TOKEN"
 ```

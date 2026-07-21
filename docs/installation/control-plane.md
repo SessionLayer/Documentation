@@ -20,6 +20,11 @@ cd ControlPlane-API
 ls target/controlplane-*.jar
 ```
 
+> **Note:** building from a clone means you run whatever the checkout contains —
+> for anything beyond evaluation, build from a reviewed, pinned commit or tag,
+> not a moving branch. [Supply chain](../security/supply-chain.md) covers
+> verifying released artifacts.
+
 ## Configure the database — two roles, on purpose
 
 The Control Plane connects to Postgres twice, as two different roles:
@@ -33,7 +38,8 @@ The Control Plane connects to Postgres twice, as two different roles:
   application credential is contained by the database itself.
 
 Set the runtime password **before first boot**, in both places, to the same
-value:
+value (generate one with `openssl rand -hex 24` — the runtime password must be
+alphanumeric):
 
 ```properties
 spring.flyway.url=jdbc:postgresql://db.example.com:5432/sessionlayer

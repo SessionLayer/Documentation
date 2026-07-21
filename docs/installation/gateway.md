@@ -37,6 +37,11 @@ docker build -f deploy/Dockerfile -t sessionlayer-gateway .
 # cargo build --release -p gateway && sudo install target/release/gateway /usr/local/bin/gateway
 ```
 
+> **Note:** building from a clone means you run whatever the checkout contains —
+> for anything beyond evaluation, build from a reviewed, pinned commit or tag,
+> not a moving branch. [Supply chain](../security/supply-chain.md) covers
+> verifying released artifacts.
+
 ## Write the config
 
 The Gateway reads one JSON config file, from `--config <path>` or the
@@ -75,6 +80,10 @@ identity with a generation counter, and it is a first-class, lockable
 principal. Two operator steps, both against the Control Plane's database
 (gateway enrollment deliberately has no REST endpoint — it is the trust
 bootstrap that everything else rests on):
+
+`$CP_DSN` below is a Postgres connection string for the Control Plane's
+database, as the owner role — for example
+`postgres://sessionlayer:<owner-password>@db.example.com:5432/sessionlayer`.
 
 **1. Export the internal mTLS CA certificate** — the trust anchor the Gateway
 pins to recognize the genuine Control Plane before it has any identity:
