@@ -111,7 +111,13 @@ its use is audited.
 | Listener | Default | Who connects |
 |---|---|---|
 | REST API + OIDC pages | `:8080` (`server.port`) | admins, users, the Dashboard, machine clients |
-| mTLS gRPC plane | `:9090` (`sessionlayer.mtls.server.port`) | Gateways and Agents only |
+| mTLS gRPC plane | `:9090` built-in default; set `sessionlayer.mtls.server.port=9443` | Gateways and Agents only |
+
+All examples in this documentation put the gRPC plane on **9443** — it is what
+the Gateway's `cp_mtls_endpoint` and the Agent's `--cp-endpoint` default to and
+what the shipped deployment manifests use — so set
+`sessionlayer.mtls.server.port=9443` (or map a `9443` Service port onto the
+container). The built-in default is `9090`; either works if both sides agree.
 
 Run the REST surface behind your TLS-terminating L7 load balancer, on HTTPS
 only. The Control Plane honors `X-Forwarded-*` headers for client IPs

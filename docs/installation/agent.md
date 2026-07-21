@@ -65,7 +65,7 @@ is your provenance.
 sessionlayer-agent run \
   --node-name web-01 \
   --join-method token --join-token-file /run/join-token \
-  --cp-endpoint https://cp.example.com:9090 \
+  --cp-endpoint https://cp.example.com:9443 \
   --cp-server-name cp.example.com \
   --bootstrap-ca-file /etc/sessionlayer/cp-mtls-ca.pem \
   --data-dir /var/lib/sessionlayer-agent

@@ -44,7 +44,7 @@ The Gateway reads one JSON config file, from `--config <path>` or the
 
 ```json
 {
-  "cp_mtls_endpoint": "https://cp.example.com:9090",
+  "cp_mtls_endpoint": "https://cp.example.com:9443",
   "data_dir": "/var/lib/sessionlayer-gateway",
   "bootstrap": {
     "enrollment_token": "",

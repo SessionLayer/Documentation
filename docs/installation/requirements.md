@@ -71,7 +71,7 @@ The shape of the traffic:
 | From → to | Protocol | Purpose |
 |---|---|---|
 | users → Gateway | SSH (`:22`, or a high port behind an L4 LB) | the outer SSH leg |
-| Gateway → Control Plane | gRPC over mTLS (`:9090`) | authorization, certificate signing, locks |
+| Gateway → Control Plane | gRPC over mTLS (`:9443` by convention) | authorization, certificate signing, locks |
 | Gateway → nodes | SSH (`:22`) | the inner leg (agentless model) |
 | Agents → Gateway | WebSocket over TLS (outbound only) | agent control channel + dial-back |
 | Gateway ↔ Gateway | TLS (HA mode) | direct session relay — bytes never touch the bus |
