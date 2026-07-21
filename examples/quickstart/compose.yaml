@@ -52,6 +52,9 @@ services:
     build:
       context: .
       dockerfile: cp.Dockerfile
+      # Unpinned `#main` is an evaluation convenience: this builds whatever the
+      # branch tip is right now. Production installs verify a signed release
+      # instead (docs/security/supply-chain.md).
       additional_contexts:
         src: https://github.com/SessionLayer/ControlPlane-API.git#main
     environment:
@@ -81,7 +84,7 @@ services:
       retries: 60
       start_period: 90s
 
-  # One-shot provisioning that has no public API surface: extracts the two CA
+  # One-shot provisioning that has no public API surface: extracts the CA
   # trust anchors, mints the Gateway's enrollment token, creates the admin
   # service account, and installs the customer recording key (public half only).
   # Everything else in the guide uses the real REST API. Idempotent across
@@ -90,6 +93,7 @@ services:
     build: ./seed
     volumes:
       - state:/state
+      - customer-key:/keys
       - gw-data:/gw-data
     depends_on:
       controlplane:
@@ -97,6 +101,7 @@ services:
 
   gateway:
     build:
+      # Unpinned `#main` — see the note on the controlplane build above.
       context: https://github.com/SessionLayer/Gateway.git#main
       dockerfile: deploy/Dockerfile
     command: ["--config", "/state/gateway.json"]
@@ -138,12 +143,17 @@ services:
     profiles: [tools]
     build: ./tools
     volumes:
-      - state:/state:ro
+      - customer-key:/keys:ro
       - .:/work
     working_dir: /work
 
 volumes:
   pgdata: {}
   miniodata: {}
+  # Shared public trust material (CA anchors) + the rendered Gateway config.
   state: {}
+  # The demo customer recording PRIVATE key — mounted only into `seed` and the
+  # `decrypt` tool, never into the recorded node, the client, or the Gateway.
+  # Production keeps this key offline entirely (docs/admin-guides/session-recording.md).
+  customer-key: {}
   gw-data: {}

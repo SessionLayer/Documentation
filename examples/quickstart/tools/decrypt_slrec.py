@@ -103,7 +103,7 @@ def main() -> None:
     parser.add_argument("object", help="the sealed recording object (SLREC1)")
     parser.add_argument(
         "--key",
-        default="/state/customer_key.pem",
+        default="/keys/customer_key.pem",
         help="customer PRIVATE key, PEM (default: the quickstart demo key)",
     )
     parser.add_argument(

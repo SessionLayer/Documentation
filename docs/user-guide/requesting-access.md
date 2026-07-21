@@ -5,12 +5,16 @@ When you need a node your standing grants don't cover, you request just-in-time
 people approve it; you get a time-boxed grant and connect as usual. This page
 walks the flow from the requester's side, end to end, on the quickstart stack.
 
-Prerequisites:
+## Prerequisites
 
 - [ ] The [quickstart](../getting-started/quickstart.md) stack is running and
       you completed it in your current shell (it set `$NODE_ID`; this page
       re-mints `$TOKEN` below).
 - [ ] `curl` and `jq` on your machine.
+
+> **Note:** the `accept-new` in these evaluation blocks is fine against the
+> throwaway loopback stack; production clients pre-provision the Gateway's
+> host key instead — see [SSH access](ssh-access.md).
 
 ## How a request flows
 
@@ -38,7 +42,7 @@ lock — deny always wins.
 A request moves through these states:
 
 | State | Meaning |
-|---|---|
+| --- | --- |
 | `PENDING_APPROVAL` | Waiting on the next approval level. |
 | `APPROVED` / `ACTIVE` | Granted; the clock is running. A zero-level chain goes here immediately. |
 | `DENIED` | An approver denied it (terminal). |

@@ -11,7 +11,7 @@ door in front of the SSH access to a fleet of Linux hosts, usable from stock
 OpenSSH clients — no custom client software.
 
 | Component | What it is | Sees session plaintext? |
-|---|---|---|
+| --- | --- | --- |
 | **Control Plane** | The management service (Java). It decides — authentication, RBAC, certificate signing, inventory, audit — and serves the REST API and the Dashboard. | No |
 | **Gateway** | The data-plane proxy (Rust). Users connect to it with `ssh`; it terminates the connection, asks the Control Plane for a decision, opens a second SSH connection to the node, and bridges the two. It records every session. | **Yes — the only component that does** |
 | **Agent** | An optional, minimal per-node connector (Rust) for nodes that cannot accept inbound connections. It dials out to the Gateway; nothing ever dials in to it. | No |
@@ -82,8 +82,9 @@ a second, node-local audit trail independent of the platform.
 Two separate RBAC systems govern the platform, and they share no rules:
 
 - **data-plane RBAC** — who may SSH where, as which Linux login, with which
-  capabilities (shell, exec, SFTP, SCP, port forwarding — each individually
-  grantable, default `shell`+`exec` only).
+  capabilities (shell, exec, SFTP, SCP — each individually grantable, default
+  `shell`+`exec` only; the vocabulary also reserves port forwarding and X11,
+  which the Gateway does not admit in this release).
 - **platform RBAC** — who may administer SessionLayer itself (edit rules,
   enroll nodes, replay recordings, read audit).
 
@@ -117,8 +118,8 @@ Every session is tagged with one of three **access models**:
 
 Every session is recorded — terminal output *and* keystrokes — in the standard
 asciicast v2 format. File transfers are audited by protocol decoding: names,
-sizes, and content hashes, never file content (see
-[File transfer](../user-guide/file-transfer.md)).
+sizes, and content hashes, never file content — with one legacy-`scp`
+exception, stated in [File transfer](../user-guide/file-transfer.md).
 
 Recordings are sealed to the **customer recording key**: an encryption key pair
 whose private half only you, the operator, hold. The Control Plane stores only
@@ -145,7 +146,7 @@ does and does not protect against.
 ## Term reference
 
 | Term | Meaning |
-|---|---|
+| --- | --- |
 | node | a Linux host you reach through SessionLayer |
 | session | one recorded SSH connection through a Gateway |
 | access model | how a session was authorized: standing, JIT, or break-glass |

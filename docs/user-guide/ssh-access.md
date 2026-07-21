@@ -7,7 +7,7 @@ node, what the authentication prompts look like, and what to expect when access
 is refused. Every command here runs against the
 [quickstart](../getting-started/quickstart.md) stack.
 
-Prerequisites:
+## Prerequisites
 
 - [ ] The quickstart stack is running and you completed it (your client
       container has a pinned key for `alice@example.com`).
@@ -22,7 +22,7 @@ SessionLayer needs two things from your connection — the Linux login and the
 target node — and offers three ways to say them:
 
 | Mode | You type | How the node travels |
-|---|---|---|
+| --- | --- | --- |
 | Username encoding | `ssh deploy%web-01@gw.example.com` | inside the username |
 | Wildcard DNS | `ssh deploy%web-01.nodes.example.com@…` | inside the username; the Gateway strips the DNS suffix |
 | ProxyJump | `ssh -J gw.example.com deploy@web-01` | as the jump target — a natural `user@node` |
@@ -41,6 +41,10 @@ halves non-empty:
 docker compose exec -T client ssh -p 2222 -o StrictHostKeyChecking=accept-new \
   deploy%web-01@gateway 'hostname'
 ```
+
+(`accept-new` trusts the front door's key on first contact — acceptable for
+this throwaway stack; the [verified way](#verify-the-gateways-host-key) is
+just below.)
 
 Typing the encoding every time gets old, so give each node a `~/.ssh/config`
 block — after this, plain `ssh web-01` works:
@@ -63,6 +67,35 @@ docker compose exec -T client ssh web-01 'hostname'
 > the hostname, and a `user@` on the command line overrides the config's
 > `User`. For a fully natural `ssh user@node` with nothing per-node, use
 > ProxyJump below.
+
+## Verify the Gateway's host key
+
+The Gateway's front door is an SSH server, and verifying it is your client's
+job — the platform verifies everything on *its* side of the Gateway (nodes,
+Agents, enrollment) but cannot verify itself to you. In production your
+operator publishes the Gateway's host key (or its `SHA256:` fingerprint) and
+managed clients pre-provision it in `known_hosts` with strict checking — the
+same discipline as any SSH server you care about, and what replaces the
+`accept-new` shortcut used above.
+
+The quickstart Gateway persists its host key (`ssh.host_key_path`), so you
+can do the production-grade version right here — fetch the public half from
+the Gateway's data volume, install it, and connect with full verification;
+no first-use prompt, no leap of faith:
+
+```bash
+GW_HOSTKEY=$(docker compose run --rm -T --entrypoint sh seed -c 'ssh-keygen -y -f /gw-data/ssh_host_key' 2>/dev/null)
+docker compose exec -T client sh -c "mkdir -p /root/.ssh && echo '[gateway]:2222 $GW_HOSTKEY' > /root/.ssh/known_hosts_gw"
+docker compose exec -T client ssh -p 2222 -o UserKnownHostsFile=/root/.ssh/known_hosts_gw \
+  -o StrictHostKeyChecking=yes deploy%web-01@gateway 'echo verified, no TOFU'
+```
+
+> **Note:** the front door presents a plain host key; the host-CA-signed
+> certificate appears on the ProxyJump *target* hop (below), where
+> `@cert-authority` verifies it. An unverified first contact with the front
+> door is exposed to a man-in-the-middle like any SSH server's would be —
+> which is why production clients get the key from the operator, not from
+> the network.
 
 ## Wildcard DNS
 
@@ -124,8 +157,11 @@ or explicit names) rather than `*`.
 
 > **Warning:** if a client disables host-key checking on the target hop, it
 > gives up the no-TOFU guarantee — that is client misconfiguration, not a
-> platform mode. Keep the target strict; only the jump hop may be `accept-new`.
-> Agent forwarding is always refused on the ProxyJump path, and only one hop is
+> platform mode. Keep the target strict; the jump hop's `accept-new` is a
+> shortcut for this throwaway stack — production clients pre-provision the
+> Gateway's host key there too (see
+> [Verify the Gateway's host key](#verify-the-gateways-host-key)). Agent
+> forwarding is always refused on the ProxyJump path, and only one hop is
 > allowed — a second nested jump is refused.
 
 ## How authentication looks
@@ -149,7 +185,8 @@ to the next method — you re-authenticate, you don't get locked out.
     -d '{"identity":"alice@example.com","allowedPrincipals":["deploy"],"ttlSeconds":300}' | jq '{otp, expiresAt}'
   ```
 
-  Connecting with no usable key, you're prompted (input hidden):
+  Connecting with no usable key, you're prompted (input hidden) — this is
+  what the exchange looks like:
 
   ```text
   $ ssh deploy%web-01@gw.example.com
@@ -157,6 +194,16 @@ to the next method — you re-authenticate, you don't get locked out.
   Enter a one-time passcode, or press Enter to log in via your browser.
   (deploy%web-01@gw.example.com) One-time passcode:
   deploy@web-01:~$
+  ```
+
+  To try it on this stack, turn off public-key authentication for one
+  connection (your pinned key would otherwise win silently) and run it from
+  an **interactive terminal** — note there is no `-T`, because you type the
+  passcode at the prompt; a non-interactive runner should skip this block:
+
+  ```bash
+  docker compose exec client ssh -p 2222 -o PubkeyAuthentication=no \
+    -o StrictHostKeyChecking=accept-new deploy%web-01@gateway
   ```
 
   After an OTP (or device-flow) success the Gateway *pins* the public key your
@@ -195,7 +242,7 @@ whether an identity, node, or rule exists. After authorization, operational
 errors may be specific (you're already entitled to know the target exists).
 
 | You see | It means | Do |
-|---|---|---|
+| --- | --- | --- |
 | connection dropped before any SSH banner | your source IP is outside the operator's allow-list | connect from an approved network |
 | standard SSH authentication failure | no method succeeded | check your key/OTP; ask your admin |
 | `access denied by policy` | authenticated, but no rule allows this login on this node — or a lock is in force | request access ([JIT](requesting-access.md)) or ask your admin |

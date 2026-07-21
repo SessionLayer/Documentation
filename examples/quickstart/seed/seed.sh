@@ -8,7 +8,8 @@
 #   4. the `quickstart-admin` service account + its dev-only client secret
 #      (the first-admin bootstrap claim in the guide is what makes it an admin)
 #   5. a demo customer recording key pair: the PUBLIC half goes to the Control
-#      Plane; the private half stays in /state and never leaves this stack
+#      Plane; the private half stays on the dedicated /keys volume (mounted
+#      only here and into the decrypt tool) and never leaves this stack
 #
 # Idempotent: safe to re-run on every `docker compose up`.
 set -eu
@@ -75,6 +76,10 @@ if [ ! -f "$STATE/gateway.json" ]; then
 	token="qs-$(head -c16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 	psql_q "INSERT INTO runtime.gateway_enrollment_token(id,token_hash,gateway_name,single_use,expires_at,created_by)
 	        VALUES (gen_random_uuid(),'$(sha_hex "$token")','gw-quickstart',true,now()+interval '2 hours','quickstart-seed')" >/dev/null
+	# require_https=false is DEV-ONLY: this stack's WORM store is an in-network
+	# plain-HTTP MinIO; the product default is true — keep it in production
+	# (docs/reference/config-gateway.md). host_key_path persists the outer SSH
+	# host key in the data volume so clients can verify a stable front door.
 	cat > "$STATE/gateway.json" <<EOF
 {
   "cp_mtls_endpoint": "https://controlplane:9443",
@@ -87,6 +92,7 @@ if [ ! -f "$STATE/gateway.json" ]; then
   },
   "ssh": {
     "listen_addr": "0.0.0.0:2222",
+    "host_key_path": "/var/lib/sessionlayer-gateway/ssh_host_key",
     "node_dns_suffixes": ["nodes.example.com"],
     "proxy_jump": {
       "enabled": true
@@ -114,12 +120,14 @@ FROM config.service_account sa WHERE sa.name='quickstart-admin'
   AND NOT EXISTS (SELECT 1 FROM runtime.service_account_credential c WHERE c.service_account_name='quickstart-admin');
 SQL
 
-if [ ! -f "$STATE/customer_key.pem" ]; then
+# The private half lives on its own volume (/keys), mounted only here and into
+# the decrypt tool — never into the recorded node, the client, or the Gateway.
+if [ ! -f /keys/customer_key.pem ]; then
 	log "generating the demo customer recording key (public half -> Control Plane)"
-	openssl ecparam -name prime256v1 -genkey -noout -out "$STATE/customer_key.pem" 2>/dev/null
-	chmod 600 "$STATE/customer_key.pem"
+	openssl ecparam -name prime256v1 -genkey -noout -out /keys/customer_key.pem 2>/dev/null
+	chmod 600 /keys/customer_key.pem
 fi
-pub_b64=$(openssl ec -in "$STATE/customer_key.pem" -pubout -outform DER 2>/dev/null | base64 | tr -d '\n')
+pub_b64=$(openssl ec -in /keys/customer_key.pem -pubout -outform DER 2>/dev/null | base64 | tr -d '\n')
 psql_q "UPDATE config.operator_settings
         SET recording_customer_public_key = decode('$pub_b64','base64'),
             recording_key_seal_algorithm = 'ecies_p256',

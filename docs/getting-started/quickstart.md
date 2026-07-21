@@ -7,14 +7,16 @@ the recording locally with a key the platform itself does not hold.
 
 Everything runs in Docker containers — including the SSH client — so nothing
 here touches your own SSH configuration. The stack is a real one: the actual
-Control Plane and Gateway built from source, Postgres, a WORM object store
-(MinIO), one node running plain OpenSSH, and the platform's real REST API for
-every step.
+Control Plane and Gateway built from source, Postgres, a write-once (WORM)
+object store (MinIO), one node running plain OpenSSH, and the platform's real
+REST API for every step.
 
-Prerequisites:
+## Prerequisites
 
-- [ ] Docker Engine with Docker Compose v2.24 or newer (this guide is tested
-      with Docker 29 / Compose v5), on x86_64 or aarch64 Linux/macOS.
+- [ ] Docker Engine with a current Docker Compose v2 (tested with Docker 29 /
+      Compose v5; the stack uses `additional_contexts`, so Compose v2.24+ is
+      required), on x86_64 or aarch64 Linux. macOS with Docker Desktop is
+      expected to work but is untested.
 - [ ] `curl` and `jq`.
 - [ ] About 10 GB of free disk during the first build and 4 GB of free RAM;
       internet access (the build pulls from GitHub and public registries).
@@ -22,9 +24,13 @@ Prerequisites:
       earlier ones.
 
 > **Note:** the first `docker compose up` compiles the Control Plane (Java)
-> and the Gateway (Rust) from source. On a typical laptop that is 10–30
-> minutes of unattended build time — the 20 minutes of *your* attention starts
-> after it. Subsequent starts reuse the images and take seconds.
+> and the Gateway (Rust) from source — from the **tip of each repository's
+> `main` branch**, unpinned. That is an evaluation convenience, not an
+> installation practice: production installs verify signed releases instead
+> (see [Supply chain](../security/supply-chain.md)). The build is roughly
+> 30–50 minutes of unattended time on a small (2-core) machine — faster with
+> more cores — and the 20 minutes of *your* attention starts after it.
+> Subsequent starts reuse the images and take seconds.
 
 ## 1. Start the stack
 
@@ -34,6 +40,9 @@ cd Documentation/examples/quickstart
 docker compose up -d --wait
 ```
 
+> **Tip:** if the first `up -d --wait` fails with a transient Docker error,
+> run it again — every service, including the seed, is safe to re-run.
+
 Compose builds and starts seven containers: `postgres`, `minio`,
 `controlplane`, `gateway`, one node (`web-01`), a `client` (your stand-in
 workstation), and a one-shot `seed`. The seed provisions exactly the four
@@ -41,14 +50,18 @@ things that have no API surface, and says so in its log: the CA trust anchors
 (the Gateway's mTLS anchor, the session CA line the node trusts, the host CA
 public key), a single-use Gateway enrollment token, the `quickstart-admin`
 service account, and a demo **customer recording key** — the Control Plane
-gets only its public half; the private half stays in a local volume.
-Everything else you are about to do uses the product's REST API.
+gets only its public half; the private half stays on a dedicated local volume
+that only the decrypt tool mounts. Everything else you are about to do uses
+the product's REST API.
 
-> **Warning:** this stack runs the Control Plane's local CA with a dev-only
-> KEK (`SESSIONLAYER_CA_LOCAL_ALLOW_DEV_KEK=true` in `compose.yaml`) and
-> fixed dev credentials, and binds everything to `127.0.0.1`. That is right
-> for a throwaway evaluation and wrong for production, where CA keys live in
-> a KMS/Key Vault/Vault backend and every credential here is real — see
+> **Warning:** this stack deliberately relaxes three things for a throwaway
+> evaluation: the Control Plane's local CA runs with a dev-only KEK
+> (`SESSIONLAYER_CA_LOCAL_ALLOW_DEV_KEK=true` in `compose.yaml`), the
+> credentials are fixed dev placeholders, and the Gateway's recorder uploads
+> to the in-network plain-HTTP MinIO with `require_https: false` in its
+> rendered config. Everything binds to `127.0.0.1`. All three are wrong for
+> production, where CA keys live in a KMS/Key Vault/Vault backend,
+> credentials are real, and the recorder keeps its HTTPS default — see
 > [Production hardening](../security/hardening.md).
 
 Wait for the Gateway to finish enrolling with the Control Plane and open its
@@ -92,9 +105,10 @@ TOKEN=$(curl -s http://127.0.0.1:8080/v1/oauth2/token -H 'Content-Type: applicat
 
 `web-01` is a plain Debian container running stock `sshd` — SessionLayer
 installs nothing on it. Enrolling an agentless node means telling the Control
-Plane its dial address and its host identity. There is no trust-on-first-use
-anywhere: you fetch the node's host key from the node yourself and pin it at
-enrollment:
+Plane its dial address and its host identity. The platform's own connections
+never trust a host on first use: the Gateway accepts only the host identity
+you enroll, so you fetch the node's host key from the node yourself and pin
+it here:
 
 ```bash
 HOSTKEY=$(docker compose exec -T web-01 cat /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $1" "$2}')
@@ -156,12 +170,18 @@ That's a stock `ssh` client addressing node `web-01` as login `deploy` through
 the Gateway (the `login%node` username encoding — the
 [SSH access guide](../user-guide/ssh-access.md) shows two more addressing
 modes, including natural `user@node` via ProxyJump). Behind the one command:
-source gate, pin authentication, a signed authorization decision, a fresh
-inner certificate, host-key verification against your pin, and a recorder on
-the bridged session.
+a source-IP gate, pin authentication, a signed authorization decision, a
+fresh [inner certificate](concepts.md) (the Gateway's own short-lived
+certificate toward the node), host-key verification against your pin, and a
+recorder on the bridged session. Run the same command without the trailing
+`'echo …'` for an interactive shell — everything you type is part of the
+recorded session.
 
-> **Tip:** run the same command without the trailing `'echo …'` for an
-> interactive shell — everything you type is part of the recorded session.
+> **Note:** `accept-new` here trusts the Gateway's host key on first contact —
+> fine for this throwaway loopback stack. Production clients pre-provision
+> the Gateway's host key and connect strictly; the
+> [SSH access guide](../user-guide/ssh-access.md) shows exactly that against
+> this stack.
 
 Deny is just as real. `dba` is a valid login on the node, but no rule grants
 it, so:
@@ -190,8 +210,11 @@ curl -s "http://127.0.0.1:8080/v1/audit-events?correlationId=$SESSION" \
 ```
 
 You get the authorization decision plus the recording lifecycle, correlated by
-session id. The same API searches by identity, node label, source IP,
-capability, and access model — see [Audit](../admin-guides/audit.md).
+session id. Entries acted by the platform itself carry its component identity
+as the actor — the bare UUID on `authz.decision` and `session.end` is the
+Gateway's own enrolled identity. The same API searches by identity, node
+label, source IP, capability, and
+[access model](concepts.md) — see [Audit](../admin-guides/audit.md).
 
 ## 8. Fetch and decrypt the recording
 
@@ -222,9 +245,9 @@ head -c 6 recording.slrec; echo
 property: the recording is encrypted to the **customer recording key**, and
 the platform stores only the public half. Nobody with Control Plane access,
 object-store access, or a platform admin role can read it. Decrypt it yourself
-with the private half (the seed left the demo key in the stack's state volume;
-the decryptor is a small offline tool shipped with this example — its first
-run builds a container for it):
+with the private half (the seed left the demo key on a dedicated volume that
+only the decrypt tool mounts; the decryptor is a small offline tool shipped
+with this example — its first run builds a container for it):
 
 ```bash
 docker compose run --rm -T decrypt recording.slrec > session.cast
@@ -256,7 +279,7 @@ rm -f recording.slrec session.cast
 `down -v` removes the database, the recordings, and the demo keys; the built
 images stay for a fast next start.
 
-## Where to next
+## Next
 
 - [Core concepts](concepts.md) — the architecture you just exercised, in ten minutes.
 - [SSH access](../user-guide/ssh-access.md) — addressing modes, `~/.ssh/config`, ProxyJump with `@cert-authority`, all against this stack.

@@ -3,14 +3,20 @@
 SFTP and SCP work through SessionLayer exactly as they do against a plain SSH
 server — same commands, same flags — provided your grant includes the `sftp` or
 `scp` capability. Every transfer is audited by protocol decoding: operation,
-path, direction, size, and a SHA-256 of the content. The content itself is
-never captured. This page shows both, live, on the quickstart stack.
+path, direction, size, and a SHA-256 of the content. For SFTP-protocol
+transfers — which includes modern `scp` — the content itself is never captured
+(one legacy-`scp` edge is called out below). This page shows both, live, on
+the quickstart stack.
 
-Prerequisites:
+## Prerequisites
 
 - [ ] The [quickstart](../getting-started/quickstart.md) stack is running and
       you completed it in your current shell.
 - [ ] `curl` and `jq` on your machine.
+
+> **Note:** the `accept-new` in these evaluation blocks is fine against the
+> throwaway loopback stack; production clients pre-provision the Gateway's
+> host key instead — see [SSH access](ssh-access.md).
 
 ## Transfers are a capability
 
@@ -54,6 +60,14 @@ docker compose exec -T client scp -P 2222 -o StrictHostKeyChecking=accept-new \
   /tmp/report.txt deploy%web-01@gateway:/home/deploy/scp-copy.txt
 ```
 
+> **Warning:** legacy `scp -O` runs over an `exec` channel, and every exec
+> channel is terminal-captured — so a legacy-mode transfer's raw bytes **do
+> land inside the sealed session recording** (readable only by the customer
+> recording key holder, and retained for the full retention period). Modern
+> `scp` and `sftp` are content-free in the recording. If the file is
+> sensitive, don't use `-O` — see
+> [Session recording](../admin-guides/session-recording.md).
+
 ## What the audit captures
 
 When a transfer session ends, the Gateway reports the decoded operations into
@@ -88,11 +102,16 @@ were transferred, without the platform storing the bytes.
 ## What is deliberately not captured
 
 - **File content.** The audit is metadata: names, sizes, hashes, direction.
-  The transferred bytes are hashed in a streaming pass and discarded — they
-  appear in no recording and no audit row.
-- **A hidden copy of your session.** The session recording for a transfer
-  channel contains transfer *markers*, not data. Interactive shells are
-  recorded in full (output and keystrokes) — file transfers are not shells.
+  For SFTP — including modern `scp`, which rides the SFTP subsystem — the
+  transferred bytes are hashed in a streaming pass and discarded: they appear
+  in no recording and no audit row. The one exception is legacy `scp -O` (the
+  Warning above): its bytes ride an exec channel and are part of the terminal
+  capture — the [trust model](../security/trust-model.md) states the same
+  edge.
+- **A hidden copy of your session.** The session recording for an SFTP
+  transfer channel contains transfer *markers*, not data. Interactive shells
+  are recorded in full (output and keystrokes) — file transfers are not
+  shells.
 
 > **Note:** the SHA-256 lets an auditor prove a specific file crossed the
 > boundary (hash it and compare) without the platform ever holding the file.

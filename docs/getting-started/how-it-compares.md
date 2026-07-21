@@ -50,9 +50,13 @@ features.
   a failed Gateway terminates (fail-closed) and you reconnect; surviving
   Gateways keep serving. Live SSH crypto state is not replicated — reconnection
   is cheap by design (pinned keys re-authenticate silently).
-- **Trust-on-first-use, anywhere.** If a host identity cannot be verified
-  against enrolled material, the connection fails. There is no "accept and
-  remember" fallback to misconfigure.
+- **Trust-on-first-use in the platform's own verification.** Wherever the
+  platform verifies an identity — the Gateway toward a node, Agent and
+  Gateway enrollment — an identity that cannot be checked against enrolled
+  material fails the connection; there is no "accept and remember" fallback.
+  One verification is still yours to configure: your `ssh` client's check of
+  the Gateway's front door, done by pre-provisioning its host key like any
+  SSH server's (see [SSH access](../user-guide/ssh-access.md)).
 
 ## Against the usual alternatives
 
