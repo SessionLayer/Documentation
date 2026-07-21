@@ -29,8 +29,9 @@ The API accepts three first-class authentication schemes. HTTP Basic is delibera
 | Mutual TLS | A client certificate on the TLS connection | Machine consumers and internal callers |
 
 Every request then passes platform RBAC: the operation's required permission (from the closed
-vocabulary below) must be granted to the caller through a role binding. The two public exceptions are
-the meta probes and the device-flow poll, which authenticate by other means or not at all.
+vocabulary below) must be granted to the caller through a role binding. Three operations sit outside
+the bearer/mTLS gate by design: the meta probes (public), the device-flow poll (the device code is
+the credential), and the token endpoint (the client authenticates itself there).
 
 ### Pagination
 
