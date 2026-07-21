@@ -29,7 +29,7 @@ The quick self-audit:
 Certificates are backdated for skew and the Gateway expires grants
 conservatively, but NTP discipline is an assumption, not an option — minutes
 of divergence on a node makes its `sshd` reject inner certificates. On every
-CP, Gateway, and node host:
+Control Plane, Gateway, and node host:
 
 ```bash
 timedatectl show -p NTPSynchronized    # expect: NTPSynchronized=yes

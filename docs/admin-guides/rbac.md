@@ -9,10 +9,11 @@ anywhere, and vice versa.
 
 ## Prerequisites
 
-- An admin credential with `rbac:write` (data-plane rules) or `rbac:write` +
-  `user:manage` (platform roles and bindings). The examples use a bearer token
-  in `$TOKEN` — see [Authentication](authentication.md).
-- Nodes enrolled with meaningful labels ([Nodes](nodes.md)).
+- [ ] An admin credential with `rbac:write` (data-plane rules) or
+      `rbac:write` + `user:manage` (platform roles and bindings). The
+      examples use a bearer token in `$TOKEN` — see
+      [Authentication](authentication.md).
+- [ ] Nodes enrolled with meaningful labels ([Nodes](nodes.md)).
 
 ## Data-plane rules
 
@@ -41,7 +42,7 @@ curl -s https://cp.example.com/v1/rules \
   }'
 ```
 
-Anyone in the IdP group `developers` may now SSH to any node labelled
+Anyone in the IdP group `developers` may now SSH to any node labeled
 `env=staging`, as the Linux user `deploy`, for sessions authorized up to 8
 hours, with shell, exec, and SFTP. Invalid config — empty principals, a
 non-positive TTL, an unknown capability, a malformed selector — is rejected
@@ -105,8 +106,9 @@ replica answers identically:
 4. Otherwise: **default deny.** No rule, no access.
 
 The user always sees one generic "access denied by policy", whatever the
-reason; the specific matched rule or lock is recorded in the decision log for
-admins and auditors ([Audit](audit.md)). The allow decision is signed and
+reason; the specific matched rule or lock is recorded in the
+[decision log](audit.md) — the `authz.decision` events of the audit stream —
+for admins and auditors. The allow decision is signed and
 handed to the Gateway, which re-checks capability, expiry, and the lock set
 locally on every channel open — so a `ControlMaster` connection multiplexing
 channels for hours cannot outlive a policy change.

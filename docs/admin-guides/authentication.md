@@ -8,10 +8,11 @@ first-admin access.
 
 ## Prerequisites
 
-- A configured OIDC identity provider (see
-  [Install the Control Plane](../installation/control-plane.md)).
-- For the admin API calls: a bearer token in `$TOKEN` — from your own OIDC
-  login or a service account (see [Machine identities](#machine-identities)).
+- [ ] A configured OIDC identity provider (see
+      [Install the Control Plane](../installation/control-plane.md)).
+- [ ] For the admin API calls: a bearer token in `$TOKEN` — from your own
+      OIDC login or a service account (see
+      [Machine identities](#machine-identities)).
 
 ## The SSH method ladder
 
@@ -21,7 +22,8 @@ authentication, and evaluates what the client offers in a fixed order:
 1. **User certificate** — a short-lived certificate from the
    [user CA](certificate-authorities.md) (for example, Vault-issued).
 2. **Pinned key** — a public key pinned to your identity by a previous login.
-3. **Pre-issued OTP** — a single-use code, entered over keyboard-interactive.
+3. **Pre-issued OTP** — a one-time passcode, entered over
+   keyboard-interactive.
 4. **OIDC device flow** — browser sign-in at your IdP, as the fallback.
 
 An expired or invalid credential degrades gracefully to the next method — it
@@ -96,7 +98,7 @@ curl -s -X DELETE https://cp.example.com/v1/pins/$PIN_ID \
 
 ## Pre-issued OTPs
 
-An OTP is a single-use code an admin issues for a specific identity —
+An OTP is a one-time passcode an admin issues for a specific identity —
 useful for onboarding someone whose IdP account isn't live yet, or as a
 controlled recovery path:
 

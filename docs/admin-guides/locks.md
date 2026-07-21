@@ -23,8 +23,8 @@ When a lock lands it does three things at once:
 
 ## Prerequisites
 
-- The `lock:write` platform permission (`lock:read` to list); a bearer token
-  in `$TOKEN` ([Authentication](authentication.md)).
+- [ ] The `lock:write` platform permission (`lock:read` to list); a bearer
+      token in `$TOKEN` ([Authentication](authentication.md)).
 
 ## Lock an identity
 

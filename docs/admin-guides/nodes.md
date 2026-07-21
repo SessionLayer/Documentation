@@ -19,12 +19,13 @@ enrollment — never trust-on-first-use.
 
 ## Prerequisites
 
-- A running Control Plane and Gateway ([install guides](../installation/control-plane.md)).
-- An admin credential with the `node:enroll` platform permission (see
-  [RBAC](rbac.md)). The examples use a bearer token in `$TOKEN` — sign in via
-  OIDC or use a service account's `POST /v1/oauth2/token` grant
-  ([Authentication](authentication.md)).
-- On the node: OpenSSH `sshd`, plus the session CA trust line described below.
+- [ ] A running Control Plane and Gateway ([install guides](../installation/control-plane.md)).
+- [ ] An admin credential with the `node:enroll` platform permission (see
+      [RBAC](rbac.md)). The examples use a bearer token in `$TOKEN` — sign in
+      via OIDC or use a service account's `POST /v1/oauth2/token` grant
+      ([Authentication](authentication.md)).
+- [ ] On the node: OpenSSH `sshd`, plus the session CA trust line described
+      below.
 
 ## Prepare the node's sshd (both models)
 
@@ -123,7 +124,7 @@ sessionlayer-agent run \
 
 > **Warning:** the Agent refuses to start as root. This is a security control,
 > not a packaging nicety: node host keys are root-only, so a compromised
-> *root* agent could read the host key and impersonate the node. Run it as a
+> *root* Agent could read the host key and impersonate the node. Run it as a
 > dedicated user (the container image runs as uid 65532).
 
 On first contact the Agent exchanges the token for a renewable mTLS identity
@@ -231,10 +232,9 @@ issuing a fresh join token.
 | `quarantined` | locked by an admin | no |
 | `removed` | deregistered; history kept | no |
 
-Nodes also report `health` (`healthy`, `unhealthy`, `unreachable`, `unknown`)
-— an agent node is "offline" whenever its Agent holds no control channel, and
-the user sees the post-authorization "target node is offline or unreachable"
-error.
+Nodes also report `health` (`healthy`, `unhealthy`, `unreachable`,
+`unknown`). An agent node whose Agent holds no control channel cannot be
+reached — users get the generic post-authorization node-offline error.
 
 ## Next
 

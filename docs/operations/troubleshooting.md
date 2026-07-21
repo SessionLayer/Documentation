@@ -3,8 +3,10 @@
 Start from the symptom. SessionLayer's user-facing errors are deliberately a
 small, fixed set — pre-authorization errors never reveal whether an
 identity, node, or rule exists, so the *user's* message is often generic by
-design and the real answer lives in the operator-side decision log. This
-page maps each symptom to its causes and the page that fixes it.
+design and the real answer lives in the operator-side
+[decision log](../admin-guides/audit.md) — the `authz.decision` events of the
+audit stream. This page maps each symptom to its causes and the page that
+fixes it.
 
 The error taxonomy in one table:
 

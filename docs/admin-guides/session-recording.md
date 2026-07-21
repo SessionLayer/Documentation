@@ -10,8 +10,13 @@ own recordings.** Each recording is encrypted to your (the operator's) public
 key; the Control Plane stores only that public half, and the private half
 never touches any SessionLayer component. A platform admin, a compromised
 Control Plane, or SessionLayer's own developers can produce ciphertext — and
-nothing else. Secrets typed at prompts are captured, but unreadable to
-everyone except the holder of your key.
+nothing else. Secrets typed at prompts are captured, but unreadable *from
+the stored recording* to everyone except the holder of your key. The one
+component that does see session plaintext — live, at capture, before sealing
+— is the Gateway itself; that is the Tier-0 trade stated in the
+[trust model](../security/trust-model.md), and why the
+[hardening checklist](../security/hardening.md) treats Gateway placement and
+integrity as preconditions.
 
 ## What gets captured
 
@@ -40,11 +45,11 @@ mid-session, the session is refused or torn down. No recording, no session.
 
 ### Prerequisites
 
-- Access to the Control Plane's Postgres (this is a deployment-level setting,
-  deliberately not writable through the REST API).
-- Somewhere genuinely offline to keep the private key — an HSM-backed store
-  or your organization's key vault. Whoever holds it can decrypt every
-  recording.
+- [ ] Access to the Control Plane's Postgres (this is a deployment-level
+      setting, deliberately not writable through the REST API).
+- [ ] Somewhere genuinely offline to keep the private key — an HSM-backed
+      store or your organization's key vault. Whoever holds it can decrypt
+      every recording.
 
 Generate a P-256 keypair and store the **public** half (DER SPKI) in the
 operator settings row:

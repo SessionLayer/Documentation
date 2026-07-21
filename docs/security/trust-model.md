@@ -22,7 +22,7 @@ the CAs are a fully-trusted **Tier-0** component. What the platform does is
 and laptops, into one audited, hardened, short-lived-certificate control
 point. If your threat model rejects any plaintext-visible intermediary, use
 end-to-end SSH and accept the loss of recording and audit — that trade-off is
-real, and we would rather state it than paper over it.
+real, and this page states it rather than papering over it.
 
 ## What each component can see
 
@@ -55,8 +55,16 @@ non-existence):
 
 1. No long-lived SSH key is ever a standing access path — all access rides
    short-lived certificates; a bare key offered as standing auth is refused.
-2. No host or node identity is **ever** trusted on first use — enrollment
-   requires a host anchor, and an unknown host key aborts the session.
+2. No host or node identity is **ever** trusted on first use **in the
+   platform's own verification** — node enrollment requires a host anchor, an
+   unknown host key aborts the session in both connectivity models, and Agent
+   and Gateway enrollment are anchored too, never TOFU. The honest boundary:
+   how *your users' SSH clients* verify the Gateway's own front-door host key
+   is client configuration, which no server can force — distribute the
+   Gateway's host-key material and require strict checking in managed client
+   configs (see the Gateway-verification section of
+   [SSH access](../user-guide/ssh-access.md); the ProxyJump risk below is the
+   same boundary).
 3. The Control Plane never observes session plaintext.
 4. A deny, lock, or authorization decision never fails open. Allow may fail
    open in narrow, documented ways; **deny always fails closed, and deny
@@ -137,12 +145,17 @@ servers must also advertise their plain host key — a client **without** the
 trust-on-first-use the Gateway's own key. The server cannot force client-side
 verification; no SSH server can. *Your lever:* distribute the
 `@cert-authority` line and require `StrictHostKeyChecking yes` in managed
-client configs ([SSH access](../user-guide/ssh-access.md)).
+client configs — and pre-provision the Gateway's own front-door host key the
+same way, per the Gateway-verification section of
+[SSH access](../user-guide/ssh-access.md) (promise 2 above scopes what "no
+TOFU" does and does not cover client-side).
 
 ### Compliance-mode erasure is crypto-shred, and only you can do it
 
 A compliance-WORM recording cannot be deleted by anyone — including the
-platform. GDPR-style erasure for such a recording reduces to destroying your
+platform — before its retention period expires (retention is yours to set;
+keep it at or above your regime's floor). Within that window, GDPR-style
+erasure for such a recording reduces to destroying your
 customer recording key material, which is in your hands, not SessionLayer's.
 This is the same property that makes recordings unreadable to the platform;
 you cannot have one without the other. If your regime requires erasure of

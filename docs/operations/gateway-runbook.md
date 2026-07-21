@@ -19,7 +19,7 @@ Before treating a refusal as an outage, check whether the Gateway is
 | `reason=breakglass_lock_feed_unhealthy` | a break-glass channel refused because the lock feed is unhealthy — **correct** fail-closed behavior (it cannot confirm the absence of a lock) | same as above; existing channels run to grant expiry |
 | `outcome=recording_unavailable` (`break_glass=true` on the break-glass variant) | recording could not start; strict mode (always forced for break-glass) refuses the session | restore the recording path: customer key present, WORM store (S3/MinIO) reachable — see [Session recording](../admin-guides/session-recording.md) |
 | `reason=breakglass_no_grant_expiry` | the CP signed a break-glass allow without an expiry; refused because an override must be time-boxed | a CP contract/config issue — check the break-glass policy TTL |
-| `reason=authorization_denied`, `break_glass=true` | a break-glass authorize was denied — usually a matching lock (deny wins) | correlate with the CP decision log; this is policy, not a fault |
+| `reason=authorization_denied`, `break_glass=true` | a break-glass authorize was denied — usually a matching lock (deny wins) | correlate with the CP [decision log](../admin-guides/audit.md); this is policy, not a fault |
 | warn: `break-glass auth resolved to a non-BREAKGLASS access model` | token mis-binding / contract drift between Gateway and CP | investigate — this should never happen in a healthy fleet |
 | warn: `non-sk-ecdsa security key offered; break-glass supports only sk-ecdsa` | an operator offered e.g. an `ed25519-sk` key for break-glass; it was routed to the ordinary pin path | re-provision the break-glass key as `ecdsa-sk` ([Break-glass](../admin-guides/break-glass.md)) |
 
@@ -36,8 +36,8 @@ unavailable"; these reasons are the operator-side truth:
 | `reason=no_agent_registered` | no control channel for this node | is the Agent up? A registration logs `agent control channel registered` |
 | `reason=dial_back_timeout` | the Agent didn't complete the dial-back in the window | node-side: Agent health, network path Agent→Gateway |
 | `reason=agent_refused_or_local_dial_failed` | the Agent refused, or its local dial to the node's `sshd` failed | check the node's own `sshd` (the Agent reports `LOCAL_DIAL_FAILED` fast) |
-| `reason=missed_heartbeats` (`agent missed two heartbeats; deregistering`) | the Agent is genuinely gone (two full intervals of silence — a slow-but-alive agent is *not* killed) | network or process death on the node; it reconnects with backoff when healthy |
-| `reason=agent_signal_saturated` | the Agent is alive and answering but its control-channel queue stayed full for the whole dial-back window — a capacity shed | don't chase the agent; look at session concurrency to that node |
+| `reason=missed_heartbeats` (`agent missed two heartbeats; deregistering`) | the Agent is genuinely gone (two full intervals of silence — a slow-but-alive Agent is *not* killed) | network or process death on the node; it reconnects with backoff when healthy |
+| `reason=agent_signal_saturated` | the Agent is alive and answering but its control-channel queue stayed full for the whole dial-back window — a capacity shed | don't chase the Agent; look at session concurrency to that node |
 | `"control channel superseded by a newer connection"` | normal after an Agent reconnect (e.g. a healed partition); newest wins by design | none |
 | `"refusing a locked agent (deny wins)"` / `"dial-back refused (fail closed)"` | a lock covers this agent identity, or a dial-back token failed a binding check | expected during incidents; the token is never logged |
 | `"agent transport waiting for the lock feed before serving agents"` (at boot) | the transport won't serve agents until the deny-list's first snapshot arrives — deny wins | resolves when the lock feed connects; if the CP is down, agent nodes are correctly "offline" |
@@ -46,7 +46,7 @@ unavailable"; these reasons are the operator-side truth:
 Config sanity on this surface is enforced at startup, fail-closed: an
 `OUTBOUND_AGENT` node with the transport disabled is simply offline (never a
 silent fallback to an agentless dial); a wildcard `listen_addr` without an
-`advertise_url` refuses to boot (agents would be told to dial back to
+`advertise_url` refuses to boot (Agents would be told to dial back to
 `0.0.0.0`); heartbeat and frame-size bounds are validated on both ends.
 
 ## High availability operations

@@ -2,9 +2,10 @@
 
 The operator's field guide to the Agent: the exit-code contract your
 orchestrator must honor, the two security log lines that page, and the
-diagnosis for every recurring symptom. The Agent is outbound-only and
-deliberately exposes **no inbound endpoint** — its signals are exit codes,
-structured logs, and (optionally) OpenTelemetry spans.
+diagnosis for every recurring symptom. The Agent is outbound-only — it dials
+out to your Gateways and the Control Plane (CP) — and deliberately exposes
+**no inbound endpoint**: its signals are exit codes, structured logs, and
+(optionally) OpenTelemetry spans.
 
 ## The exit-code contract
 

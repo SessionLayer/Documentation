@@ -9,10 +9,10 @@ deletion work — including the WORM-correct delete semantics.
 
 ## Prerequisites
 
-- The `audit:read` platform permission (searches are additionally filtered to
-  your binding's scope). Retention and deletion actions need
-  `recording:delete`. Examples use a bearer token in `$TOKEN`
-  ([Authentication](authentication.md)).
+- [ ] The `audit:read` platform permission (searches are additionally
+      filtered to your binding's scope). Retention and deletion actions need
+      `recording:delete`.
+- [ ] A bearer token in `$TOKEN` ([Authentication](authentication.md)).
 
 ## Search the stream
 
@@ -41,6 +41,12 @@ curl -s -G https://cp.example.com/v1/audit-events \
   -H "Authorization: Bearer $TOKEN" \
   --data-urlencode "action=lock.create"
 ```
+
+The `authz.decision` events in this stream are what other pages call the
+**decision log** — the operator-side truth behind every generic
+`access denied by policy`, carrying the matched rule or lock and the full
+allow snapshot. It is not a separate store or file: search it with
+`--data-urlencode "action=authz.decision"` like any other filter.
 
 `nodeLabel` is repeatable and ANDed. Un-time-bounded searches default to the
 last 90 days; a window wider than 366 days is rejected (`422`) rather than
@@ -85,7 +91,7 @@ deliberately deferred (see the [trust model](../security/trust-model.md)).
 For depth beyond the platform's own controls: ship events off-box as they
 commit (next section), and in the agent connectivity model the node's own
 `sshd` log — which the platform cannot write to — records every accepted
-session certificate's key id (`session id + identity`), giving you a
+session certificate's key id (`session_id + identity`), giving you a
 tamper-independent cross-check by session id.
 
 ## Ship to your SIEM

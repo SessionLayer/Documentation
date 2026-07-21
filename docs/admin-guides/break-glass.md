@@ -19,10 +19,11 @@ path with its own credentials, and every use:
 
 ## Prerequisites
 
-- The `breakglass:manage` platform permission for provisioning; a bearer
-  token in `$TOKEN` ([Authentication](authentication.md)).
-- One or more FIDO2 hardware keys (the primary path).
-- A configured alert target ([break-glass policy](#the-break-glass-policy)).
+- [ ] The `breakglass:manage` platform permission for provisioning; a bearer
+      token in `$TOKEN` ([Authentication](authentication.md)).
+- [ ] One or more FIDO2 hardware keys (the primary path).
+- [ ] A configured alert target
+      ([break-glass policy](#the-break-glass-policy)).
 
 ## Provision FIDO2 keys (primary)
 

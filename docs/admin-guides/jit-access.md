@@ -10,10 +10,10 @@ If you're the person *requesting* access, see
 
 ## Prerequisites
 
-- Data-plane basics in place: nodes labelled, [RBAC](rbac.md) understood.
-- `settings:write` to create JIT policies, `request:approve` to
-  approve/deny/revoke. Examples use a bearer token in `$TOKEN`
-  ([Authentication](authentication.md)).
+- [ ] Data-plane basics in place: nodes labeled, [RBAC](rbac.md) understood.
+- [ ] `settings:write` to create JIT policies, `request:approve` to
+      approve/deny/revoke. Examples use a bearer token in `$TOKEN`
+      ([Authentication](authentication.md)).
 
 ## Define what is requestable: JIT policies
 

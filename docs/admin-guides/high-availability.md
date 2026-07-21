@@ -11,14 +11,14 @@ sections entirely; they only exist in HA mode.
 
 ## Prerequisites (HA mode)
 
-- Postgres in an HA configuration of its own — with **synchronous
-  replication for the authorization and audit tables** (a
-  [hardening precondition](../security/hardening.md)).
-- A NATS server on a trusted internal network for signaling (below).
-- An L4 load balancer for the Gateways speaking PROXY protocol v2, and an
-  L7 balancer for the Control Planes.
-- Agents configured with **two or more Gateway endpoints in distinct failure
-  domains** ([Nodes](nodes.md)).
+- [ ] Postgres in an HA configuration of its own — with **synchronous
+      replication for the authorization and audit tables** (a
+      [hardening precondition](../security/hardening.md)).
+- [ ] A NATS server on a trusted internal network for signaling (below).
+- [ ] An L4 load balancer for the Gateways speaking PROXY protocol v2, and an
+      L7 balancer for the Control Planes.
+- [ ] Agents configured with **two or more Gateway endpoints in distinct
+      failure domains** ([Nodes](nodes.md)).
 
 ## What lives where
 
@@ -82,7 +82,7 @@ On `SIGTERM` the Gateway drains in order: its readiness endpoint flips to 503
 while it *keeps accepting* for a short grace period (default 5 s) so your
 load balancer deregisters it before it stops listening; then accept loops
 stop, presence is released (standbys claim immediately), and agent control
-channels close so agents fail over. Live sessions — its own and the relays it
+channels close so Agents fail over. Live sessions — its own and the relays it
 serves — get a bounded deadline (default 30 s) to finish; anything still live
 is torn down through the recorder-finalize path, so no recording is orphaned.
 
@@ -142,7 +142,7 @@ diagnosis.
 
 - [Gateway runbook](../operations/gateway-runbook.md) — drain, presence, and
   relay log lines with actions.
-- [Nodes](nodes.md) — configuring agents with failure-domain-diverse
+- [Nodes](nodes.md) — configuring Agents with failure-domain-diverse
   channels.
 - [Monitoring](../operations/monitoring.md) — what to alert on in an HA
   fleet.

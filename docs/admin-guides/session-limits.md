@@ -13,10 +13,10 @@ per-identity policies, and exactly how each knob is enforced.
 
 ## Prerequisites
 
-- `settings:write` to manage policies (reads need `rbac:read`); a bearer
-  token in `$TOKEN` ([Authentication](authentication.md)).
-- Access to the Control Plane's deployment configuration for the cluster
-  defaults.
+- [ ] `settings:write` to manage policies (reads need `rbac:read`); a bearer
+      token in `$TOKEN` ([Authentication](authentication.md)).
+- [ ] Access to the Control Plane's deployment configuration for the cluster
+      defaults.
 
 ## Set cluster defaults (recommended)
 
@@ -69,11 +69,13 @@ remaining policies or cluster defaults on the next decision.
 ## How each knob is enforced
 
 **Concurrent sessions** is a **hard cap** applied inside the authorization
-transaction, counted fleet-wide against live session leases — correct across
+transaction, counted fleet-wide against live session
+[leases](../reference/glossary.md) — correct across
 multiple Gateways and Control Plane replicas. Under a simultaneous burst of
 connection attempts, exactly the cap succeeds; attempt N+1 receives the same
 generic "access denied by policy" as any other denial (nothing leaks that a
-limit, rather than a rule, said no — the decision log has the truth).
+limit, rather than a rule, said no — the [decision log](audit.md) has the
+truth).
 Accounting is exact: a lease is released promptly on every teardown path,
 including degraded sessions that never recorded, and a session that crashes
 without a goodbye self-heals its slot at grant expiry.

@@ -22,7 +22,7 @@ generated locally moments earlier. Three invariants keep this true end to
 end:
 
 1. The Gateway is the **only** minter of session-CA certificates, per
-   connection, post-authorization. No credential a user or agent holds is
+   connection, post-authorization. No credential a user or Agent holds is
    ever a session-CA certificate.
 2. Pinned keys are an authentication shortcut only — they live in the
    Gateway's outer-leg verifier, never in any node's trust, and every
@@ -42,7 +42,7 @@ What the node actually sees, per connection:
 
 - **Principal** — the RBAC-resolved Linux login (`deploy`), never the human
   identity. `sshd` re-enforces it natively.
-- **Key ID** — `session id + identity`, so the node's own `sshd` log records
+- **Key ID** — `session_id + identity`, so the node's own `sshd` log records
   *which human* logged in even to a shared account — the node-local second
   audit trail.
 - **Lifetime** — about 5 minutes, backdated a couple of minutes for clock

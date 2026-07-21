@@ -61,7 +61,7 @@ No. Stock OpenSSH is the supported client — `ssh`, `sftp`, `scp`, ProxyJump,
 one-line shell alias) depending on the addressing mode. See
 [SSH access](user-guide/ssh-access.md).
 
-## Do I need an agent on every node?
+## Do I need an Agent on every node?
 
 No. Agentless nodes need only stock `sshd` plus one `TrustedUserCAKeys` line
 — the Gateway dials them directly. The [Agent](admin-guides/nodes.md) exists
