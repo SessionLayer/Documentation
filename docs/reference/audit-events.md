@@ -2,7 +2,7 @@
 
 Everything security-relevant lands in one correlated, append-only audit stream — SSH-session events
 and web/admin events side by side, hash-chained for tamper evidence, searchable through the
-[API](api.md) and the Dashboard. This page catalogues the event record, the search dimensions, and
+[API](api.md) and the Dashboard. This page catalogs the event record, the search dimensions, and
 every event kind the Control Plane emits, derived from source.
 
 ## The event record
@@ -13,7 +13,7 @@ every event kind the Control Plane emits, derived from source.
 | `occurredAt` | When the action happened (RFC 3339). |
 | `actor` | The acting identity — a user, a service account, a Gateway id, or `system`. |
 | `subject` | What the action targeted (an identity, a resource id, a permission). |
-| `action` | The event kind, from the catalogue below (for example `lock.create`). |
+| `action` | The event kind, from the catalog below (for example `lock.create`). |
 | `outcome` | The per-action result — `success`, `denied`, `failure`, or an action-specific value. |
 | `correlationId` | The join key reconstructing one full path: approve → connect → run → replay. For a session it is the JIT request id, the break-glass activation id, or the session id. |
 | `sessionId` / `nodeId` | The session and node the event belongs to, where applicable. |
@@ -46,7 +46,7 @@ alerts on `action` + `outcome`. Two events are designed as high-priority signals
 clone-detection signal at renewal time, and an unreviewed break-glass activation remains visible via
 `reviewStatus=pending` on the activations API.
 
-## Event catalogue
+## Event catalog
 
 ### Enrollment and component identity
 

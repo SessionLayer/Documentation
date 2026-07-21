@@ -9,7 +9,7 @@ The split by component:
 - The **Control Plane** exposes Micrometer meters at `/actuator/prometheus` and can export OTLP
   traces.
 - The **Gateway** and **Agent** emit OTLP traces only — deliberately no metrics pipeline on the
-  Tier-0 data plane. Their rate/error/duration metrics are derived centrally from spans by an
+  [Tier-0](glossary.md) data plane. Their rate/error/duration metrics are derived centrally from spans by an
   OpenTelemetry Collector (below).
 
 ## Enabling export

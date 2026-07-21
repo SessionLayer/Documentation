@@ -38,7 +38,7 @@ implied or optional-but-undocumented.
 | Agent | node's local `sshd` | `127.0.0.1:22` | Splices each dialed-back session to sshd — loopback only, enforced | `--splice-addr` |
 | Gateway | node `sshd` | `22` (per node) | Agentless direct dial | the node's registered address |
 | Gateway (ingress) | Gateway (owner) | agent transport port | Direct peer byte relay for sessions landing on a non-owner Gateway (HA); bytes never cross the signal bus | `ha.peer_relay_advertise_addr` (empty derives from the agent transport) |
-| Gateway | NATS | `4222` | Dial-back signalling in HA with the NATS backend — signals only | `ha.coordination.backend` = `nats`, `ha.coordination.url` |
+| Gateway | NATS | `4222` | Dial-back signaling in HA with the NATS backend — signals only | `ha.coordination.backend` = `nats`, `ha.coordination.url` |
 | Gateway | Object store | `9000`/`443` | Uploads the encrypted recording directly with a short-lived credential — bytes never proxy through the Control Plane | presigned URL from the Control Plane |
 | Control Plane | Postgres | `5432` | The single source of truth | `spring.r2dbc.*` / `spring.flyway.*` |
 | Control Plane | Object store | `9000`/`443` | Presigns upload/replay/export URLs; retention | `sessionlayer.recording.worm.endpoint` |

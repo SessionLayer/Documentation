@@ -18,7 +18,7 @@ in context; every other page uses them consistently.
 - **capability** — one policy-gated thing a session may do: `shell`, `exec`, `sftp`, `scp`, local or
   remote port forwarding, agent forwarding, or X11. Rules and grants name the capabilities they
   allow.
-- **compliance mode** — the stricter WORM flavour: the recording object is truly un-deletable until
+- **compliance mode** — the stricter WORM flavor: the recording object is truly un-deletable until
   retention expires; even a governance delete is refused. Contrast with governance mode.
 - **Control Plane** — the Java management component: the REST API, policy and identity storage
   (Postgres), the certificate authorities, the authorization engine, and the audit stream. It never
@@ -32,6 +32,9 @@ in context; every other page uses them consistently.
 - **decision context** — the signed statement the Control Plane returns on an allowed connection:
   identity, groups, node, capabilities, access model, grant expiry, idle timeout, policy epoch. The
   Gateway verifies the signature and re-checks the context on every channel open.
+- **decision log** — the authorization decisions inside the audit stream: every `authz.decision`
+  event, carrying the matched rule or lock and the full allow snapshot. Not a separate store —
+  search the [audit events](audit-events.md) filtered to `action=authz.decision`.
 - **deny wins** — the platform's ordering rule: a deny (a deny rule, a lock, a quarantine) beats
   every allow, grant, or break-glass override. Allows may fail open only in the sense of being
   refused; denies always take effect.
@@ -48,11 +51,11 @@ in context; every other page uses them consistently.
 - **generation counter** — a monotonic counter inside each Gateway/Agent mTLS identity, bumped on
   every renewal. A stale clone renewing with an old generation is detected and the identity is
   locked.
-- **governance mode** — the default WORM flavour: retention protects recordings, but a specifically
+- **governance mode** — the default WORM flavor: retention protects recordings, but a specifically
   privileged, audited role may erase one (the escape hatch for legal erasure duties). Contrast with
   compliance mode.
 - **grant expiry** — the moment a session's permission ends: the minimum of the matching rule or
-  grant TTL, policy ceilings, and the identity's credential lifetime. Configurable behaviour decides
+  grant TTL, policy ceilings, and the identity's credential lifetime. Configurable behavior decides
   what happens to a live session at expiry; new privileged channels always stop.
 - **hash chain** — each audit event and recording frame carries a hash of its predecessor, so
   truncation or tampering is detectable by re-walking the chain.
@@ -79,7 +82,8 @@ in context; every other page uses them consistently.
   references.
 - **offline code** — a pre-issued, single-use break-glass code for when FIDO2 hardware is
   unavailable. Issued in batches; only hashes are stored.
-- **OTP** — a single-use, short-TTL password an admin issues for one enrollment or recovery login.
+- **OTP** — a one-time passcode: single-use, short-TTL, issued by an admin for one enrollment or
+  recovery login.
 - **outer leg** — the client↔Gateway half of a session: the connection your `ssh` command makes.
 - **pin** — an authentication shortcut binding a public-key fingerprint to an identity (optionally a
   source CIDR and principals) for a bounded time, so repeat connections skip the browser.

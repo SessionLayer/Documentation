@@ -143,7 +143,7 @@ live in [session-limit policies](api.md).
 | `sessionlayer.breakglass.offline-code-entropy-bytes` | int | `16` | Offline-code entropy in bytes (16 = 128 bits). |
 | `sessionlayer.breakglass.review-sla` | duration | `PT72H` | Advisory deadline for the mandatory post-hoc activation review. An unreviewed activation stays a standing signal — it never auto-clears. |
 
-## API behaviour
+## API behavior
 
 | Key | Type | Default | Effect |
 |---|---|---|---|

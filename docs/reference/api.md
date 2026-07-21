@@ -1,4 +1,4 @@
-# API reference
+# API
 
 The Control Plane exposes a contract-first REST API — the same surface the Dashboard uses. The
 authoritative contract is `contracts/openapi/openapi.yaml` in the ControlPlane-API repository
@@ -35,9 +35,9 @@ the credential), and the token endpoint (the client authenticates itself there).
 
 ### Pagination
 
-Collection endpoints are cursor-paginated. Pass `limit` (1–200, default 50; the server clamps to its
-maximum) and follow the response's `nextCursor` by passing it back as `cursor`. Cursors are opaque and
-forward-only; an unrecognised cursor is a `400`. A page envelope looks like:
+The config and audit collections are cursor-paginated. Pass `limit` (1–200, default 50; the server
+clamps to its maximum) and follow the response's `nextCursor` by passing it back as `cursor`.
+Cursors are opaque and forward-only; an unrecognized cursor is a `400`. A page envelope looks like:
 
 ```json
 {
@@ -46,7 +46,15 @@ forward-only; an unrecognised cursor is a `400`. A page envelope looks like:
 }
 ```
 
-A `null` or absent `nextCursor` means you have the last page.
+A `null` or absent `nextCursor` means you have the last page. This applies to rules, roles, role
+bindings, CAs, service accounts, node policies, capability definitions, JIT/break-glass/session-limit
+policies, sessions, recordings, and audit events — the endpoints whose tables below say
+"cursor-paginated".
+
+The bounded runtime listings return the full set in one response instead, in a resource-named
+array with no cursor: `pins`, `locks`, `joinTokens`, `nodes`, `jitRequests`, and the break-glass
+`credentials`, `offlineCodes`, and `activations`. So `GET /v1/nodes` yields `{"nodes": [...]}` —
+pipe it through `jq '.nodes[]'`, not `.items[]`.
 
 ### Idempotency
 
@@ -179,7 +187,7 @@ every Gateway; deny always wins over any allow, grant, or break-glass. See
 | `DELETE /v1/locks/{lockId}` | Release a lock | `lock:write`; never resurrects a torn-down session |
 
 A lock's `target` selects any combination of `identities`, `groups`, `nodeIds`, `principals`, and
-`nodeLabels`, or `all: true` for fleet-wide; an empty or unrecognised target is rejected at ingest.
+`nodeLabels`, or `all: true` for fleet-wide; an empty or unrecognized target is rejected at ingest.
 `mode` is `strict` (tear down matching live sessions and block new ones) or `best_effort` (block new
 issuance only). An optional `ttlSeconds` auto-expires the lock.
 
@@ -195,7 +203,7 @@ Single-use, short-TTL, node-scoped enrollment credentials for Agent nodes. See
 | `DELETE /v1/join-tokens/{joinTokenId}` | Revoke an unconsumed token | Idempotent |
 
 Issuance is a pure API operation, so an autoscaler or configuration management can re-provision an
-agent without a human. Revoking an already-consumed token has no effect on the identity it produced —
+Agent without a human. Revoking an already-consumed token has no effect on the identity it produced —
 revoking an issued identity is a [lock](#locks).
 
 ## Nodes
@@ -363,11 +371,11 @@ Fields: `desiredLabels` (a label map), `connectorKind` (`agent` or `agentless`),
 
 ## Capability definitions
 
-The catalogue of requestable capabilities. Requires `settings:write`.
+The catalog of requestable capabilities. Requires `settings:write`.
 
 | Operation | What it does | Notes |
 |---|---|---|
-| `GET /v1/capability-defs` | List the capability catalogue | Cursor-paginated |
+| `GET /v1/capability-defs` | List the capability catalog | Cursor-paginated |
 | `POST /v1/capability-defs` | Add a capability | Outside the closed set is a `422`; duplicate is a `409` |
 | `GET /v1/capability-defs/{capabilityDefId}` | Get one definition | |
 | `PUT /v1/capability-defs/{capabilityDefId}` | Update the description | `name` immutable; `version` required |
@@ -473,7 +481,7 @@ Recording metadata includes the `sessionId`, `identity`, `nodeId`, `format`, `st
 
 Search over the single correlated, append-only audit stream. Requires `audit:read`; results are
 additionally filtered to the caller's RBAC scope. See [Audit](../admin-guides/audit.md) and
-[Audit events](audit-events.md) for the event catalogue.
+[Audit events](audit-events.md) for the event catalog.
 
 | Operation | What it does | Notes |
 |---|---|---|

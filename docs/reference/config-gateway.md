@@ -62,7 +62,7 @@ scrub-on-drop buffer and redacted from any debug output.
 ## Identity lifecycle (`identity`)
 
 The renew-ahead loop for the Gateway's mTLS identity: renewal fires when a fraction of the
-certificate TTL has elapsed, jittered to de-synchronise a fleet.
+certificate TTL has elapsed, jittered to de-synchronize a fleet.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
@@ -84,7 +84,7 @@ certificate TTL has elapsed, jittered to de-synchronise a fleet.
 | `ssh.max_auth_attempts` | int | `6` | Per-connection cap on credential-resolution attempts (each is one Control Plane RPC). After the cap the connection is hard-rejected. |
 | `ssh.source_ip_allowlist` | list of CIDR | empty (allow all) | Global source-IP gate, evaluated at TCP accept against the real client IP, before any SSH banner. Non-empty drops any source outside it. |
 | `ssh.target_separator` | char | `%` | The username-encoding separator (`login%node`). |
-| `ssh.node_dns_suffixes` | list | empty (off) | Wildcard-DNS domains: a matching suffix is stripped from the username's node half (`deploy%web-01.ssh.example.com` → `web-01`). Longest match wins; case-insensitive. |
+| `ssh.node_dns_suffixes` | list | empty (off) | Wildcard-DNS domains: a matching suffix is stripped from the username's node half (`deploy%web-01.nodes.example.com` → `web-01`). Longest match wins; case-insensitive. |
 | `ssh.cp_connect_timeout_secs` | int (s) | `5` | Bound on establishing the Control Plane mTLS transport for an auth/authorize RPC. |
 | `ssh.cp_rpc_timeout_secs` | int (s) | `10` | Per-RPC deadline on every auth/authorize call; a hung Control Plane never hangs the SSH handshake. |
 
@@ -156,7 +156,7 @@ expires.
 
 The three expiry modes — in every mode, new privileged channels are refused once the grant expires:
 
-| Mode | Behaviour |
+| Mode | Behavior |
 |---|---|
 | `run_to_ttl` | In-flight channels run to their natural close. Least disruptive; the default for standing access. |
 | `grace_then_kill` | Wait the grace window, then tear the session down. |
@@ -167,7 +167,7 @@ The three expiry modes — in every mode, new privileged channels are refused on
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `ssh.break_glass.enabled` | boolean | `true` | Whether this Gateway offers the break-glass authentication paths. Disabled, a break-glass credential simply does not resolve. |
-| `ssh.break_glass.mid_session_expiry` | mode | `grace_then_kill` | Expiry behaviour for break-glass sessions, selected separately from `ssh.reeval.mid_session_expiry` — emergency sessions are time-boxed. |
+| `ssh.break_glass.mid_session_expiry` | mode | `grace_then_kill` | Expiry behavior for break-glass sessions, selected separately from `ssh.reeval.mid_session_expiry` — emergency sessions are time-boxed. |
 
 Strict recording is always forced for break-glass sessions regardless of these knobs.
 
@@ -180,10 +180,10 @@ gateway-to-gateway peer relay shares this listener.
 |---|---|---|---|
 | `ssh.agent.listen_addr` | string | empty (disabled) | Listen address for the Agent transport. Off, an outbound-agent node is simply offline. Dev port is `9444`. |
 | `ssh.agent.advertise_url` | string (URL) | derived from listen address | The `wss://` URL the Gateway tells an Agent to dial back to. |
-| `ssh.agent.heartbeat_interval_secs` | int (s) | `20` | Ping cadence on the control channel; two missed intervals deregister the agent. |
+| `ssh.agent.heartbeat_interval_secs` | int (s) | `20` | Ping cadence on the control channel; two missed intervals deregister the Agent. |
 | `ssh.agent.max_frame_bytes` | int (bytes) | `65536` | Max frame payload either peer may send. Must exceed `ssh.inner.max_packet_bytes` so a full SSH packet fits one frame. |
 | `ssh.agent.dial_back_token_ttl_secs` | int (s) | `30` | TTL of a minted dial-back token. Must exceed the dial-back timeout. |
-| `ssh.agent.dial_back_timeout_secs` | int (s) | `10` | How long to wait for a signalled Agent to open its stream before failing closed to "node offline". |
+| `ssh.agent.dial_back_timeout_secs` | int (s) | `10` | How long to wait for a signaled Agent to open its stream before failing closed to "node offline". |
 | `ssh.agent.handshake_timeout_secs` | int (s) | `10` | Bound on the whole TLS + WebSocket + preface handshake. |
 | `ssh.agent.max_agents` | int | `1024` | Cap on live agent control channels. |
 | `ssh.agent.max_connections` | int | `4096` | Cap on concurrently handshaking sockets, enforced before any TLS work — an unauthenticated peer cannot exhaust the Gateway. |

@@ -12,7 +12,9 @@ import re
 import sys
 import urllib.request
 
-EXCLUDE = {"product", "node_modules", ".git"}
+# audit/ holds review-finding artifacts that quote doc snippets; their relative
+# links are quotations, not navigation.
+EXCLUDE = {"product", "node_modules", ".git", "audit"}
 LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 SOFT_STATUS = {403, 429}
