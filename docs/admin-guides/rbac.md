@@ -147,30 +147,87 @@ open:
 | `exec` | yes (when omitted) | single commands |
 | `sftp` | no | SFTP subsystem |
 | `scp` | no | legacy `scp` over exec |
-| `port_forward_local` | no | accepted in policy, **not admitted by the Gateway in this release** — `-L` channels are always refused |
-| `port_forward_remote` | no | accepted in policy, **not admitted in this release** — `-R` requests are always refused |
+| `port_forward_local` | no | local port-forward (`ssh -L`) — see below |
+| `port_forward_remote` | no | remote port-forward (`ssh -R`) — see below |
 | `agent_forward` | no | **never admitted, by design** — see below |
-| `x11` | no | accepted in policy, **not admitted in this release** — X11 requests are always refused |
+| `x11` | no | X11 forwarding (`ssh -X`/`-Y`) — see below |
 
-A rule that omits `capabilities` grants `shell` + `exec` only. For the
-enforced capabilities (`shell`, `exec`, `sftp`, `scp`), a withheld capability
-produces a clear channel-level refusal, not a generic denial — by then the
-user is already authorized, so there is nothing to hide.
+A rule that omits `capabilities` grants `shell` + `exec` only. For `shell`,
+`exec`, `sftp`, and `scp`, a withheld capability produces a clear
+channel-level refusal, not a generic denial — by then the user is already
+authorized, so there is nothing to hide. A refused forward or X11 request
+fails plainer — a channel-open or request failure with no reason detail —
+so check the rule's capability list before debugging the network
+([Troubleshooting](../operations/troubleshooting.md)).
 
-> **Note:** the three forwarding-adjacent capabilities marked "not admitted"
-> exist end-to-end in the policy vocabulary — rules storing them validate and
-> sign fine — but the Gateway's data plane refuses those channel types
-> unconditionally in this release, so granting them changes nothing yet.
-> Vocabulary reserved ahead of implementation, stated here so you don't debug
-> a "granted" forward that can never work.
+### Granting port forwarding and X11
+
+Add the capabilities to a rule (or a JIT policy) exactly like `sftp`; the
+Dashboard's rule and JIT-policy editors list the same eight capabilities as
+checkboxes:
+
+```bash
+curl -s https://cp.example.com/v1/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: rule-devs-staging-tunnels-1" \
+  -d '{
+    "name": "devs-staging-tunnels",
+    "identitySelector": { "groups": ["developers"] },
+    "nodeLabelSelector": { "env": { "op": "eq", "value": "staging" } },
+    "principals": ["deploy"],
+    "ttlSeconds": 28800,
+    "capabilities": ["shell", "exec", "port_forward_local", "port_forward_remote", "x11"],
+    "effect": "allow"
+  }'
+```
+
+The grant is the **only** switch: there is no Gateway config key, environment
+variable, or flag that enables or disables forwarding — a Gateway refuses an
+ungranted forward no matter how it is deployed. What each capability admits:
+
+- **`port_forward_local`** (`ssh -L`): the **node** dials the target, so a
+  forward reaches only what the node itself can reach — the same network
+  boundary your node-label rules already assume. A granted `-L` can still
+  fail if the node cannot reach the target; the node, not the Gateway,
+  makes the connection.
+- **`port_forward_remote`** (`ssh -R`): the listener binds on the **node**,
+  matching `-R` through a plain bastion. `-R 0:…` lets the node pick a port,
+  which is reported back to your client; cancelling the forward unbinds the
+  listener.
+- **`x11`** (`ssh -X`/`-Y`): the X11 request (protocol, cookie, screen) is
+  relayed to the node unchanged; untrusted-mode cookie handling is the node
+  `sshd`'s job, exactly as on a plain OpenSSH server.
+
+Two independent controls enforce every grant: the Gateway's per-channel
+admission gate, and the inner-leg session certificate, which carries
+`permit-port-forwarding` / `permit-X11-forwarding` only when the matching
+capability was granted — so the node's own `sshd` refuses an ungranted
+forward on its own, even if the Gateway's gate were somehow bypassed
+([Trust model](../security/trust-model.md)). The node's `sshd` must also
+permit forwarding: `AllowTcpForwarding yes` is OpenSSH's default, but X11
+needs `X11Forwarding yes` and `xauth` installed on the node.
+
+Everything else applies unchanged: a [lock](locks.md) tears down a live
+forward like any other channel, tunnels count against the per-connection
+channel cap, and each tunnel is audited as **metadata only** — one
+`port_forward.closed` / `x11_forward.closed` event with capability,
+direction, target, byte counts, and duration, never the forwarded bytes
+([Audit events](../reference/audit-events.md)).
+
+> **Note:** in ProxyJump mode (`ssh.proxy_jump.enabled`) every `direct-tcpip`
+> channel *is* the jump hop, so local forwarding (`-L`) is structurally
+> unavailable there regardless of any grant — an architectural property of
+> that mode, not a policy refusal. Remote forwarding and X11 are unaffected.
 
 Agent forwarding is a different case entirely:
 
 > **Warning:** the Gateway refuses SSH agent forwarding on every path,
-> including ProxyJump, regardless of any `agent_forward` grant — and unlike
-> the reserved capabilities above, this refusal is deliberate and permanent.
-> Forwarding your agent to a Tier-0 intercepting proxy would hand it signing
-> access to your private keys; the platform declines to be trusted that far.
+> including ProxyJump, regardless of any `agent_forward` grant — this
+> refusal is deliberate and permanent, and the inner-leg certificate never
+> carries `permit-agent-forwarding` either. Forwarding your agent to a
+> Tier-0 intercepting proxy would hand it signing access to your private
+> keys; the platform declines to be trusted that far.
 
 ## Platform RBAC
 

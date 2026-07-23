@@ -82,9 +82,9 @@ a second, node-local audit trail independent of the platform.
 Two separate RBAC systems govern the platform, and they share no rules:
 
 - **data-plane RBAC** — who may SSH where, as which Linux login, with which
-  capabilities (shell, exec, SFTP, SCP — each individually grantable, default
-  `shell`+`exec` only; the vocabulary also reserves port forwarding and X11,
-  which the Gateway does not admit in this release).
+  capabilities (shell, exec, SFTP, SCP, port forwarding, X11 — each
+  individually grantable, default `shell`+`exec` only; agent forwarding is
+  never admitted, by design).
 - **platform RBAC** — who may administer SessionLayer itself (edit rules,
   enroll nodes, replay recordings, read audit).
 
