@@ -82,6 +82,39 @@ an actively *pushed* deny-list that every Gateway holds locally, so
 revocation keeps working under total datastore loss; a Gateway that cannot
 confirm its deny-list refuses what it cannot verify.
 
+## Port forwarding and X11: granted, bounded, metadata-only
+
+Port forwarding (`ssh -L`/`-R`) and X11 are admitted only when the session's
+signed grant carries the matching capability (`port_forward_local`,
+`port_forward_remote`, `x11`) — there is no Gateway-side switch of any kind;
+the grant is the sole mechanism, verified the same way as every other
+capability. Two independent controls hold the line: the Gateway's
+per-channel admission gate, and the inner-leg session certificate, which
+carries `permit-port-forwarding` / `permit-X11-forwarding` only for granted
+capabilities and **never** `permit-agent-forwarding` — so even if the
+Gateway's own gate were somehow bypassed, the node's `sshd` refuses an
+unpermitted forward on its own. Agent forwarding stays refused always,
+everywhere, by design.
+
+A granted forward is not a network escape: the **node** dials a local
+forward's target and hosts a remote forward's listener, so a tunnel reaches
+only what the node itself can reach — the same boundary your node-level
+rules already assume. Locks tear down live tunnels like any other channel,
+and tunnels count against the per-connection channel cap.
+
+Forwarded bytes are opaque — a database protocol, an HTTP API, an X11
+session — with no universal decode and no way to redact, so capturing them
+raw would be a materially weaker privacy posture than the platform's
+purpose-decoded, customer-key-sealed recordings. Forwarded content is
+therefore **never captured**: the sealed recording carries tamper-evident
+open/close markers, and the audit stream gets one metadata event per tunnel
+(capability, direction, target, byte counts, duration), delivered when the
+session's recording finalizes — the same timing as file-transfer audit
+([Audit events](../reference/audit-events.md)). If you need content
+inspection of forwarded traffic, put an inspecting proxy at the target;
+SessionLayer tells you a tunnel existed, where it went, and how much moved —
+not what it said.
+
 ## Accepted risks, in plain language
 
 Every risk below is documented in the product repositories' audit records and
@@ -169,7 +202,9 @@ decrypt. Treat recording replay authority accordingly. Also: legacy
 `scp`-over-exec transfers land their raw bytes in the terminal capture
 (modern SFTP-based transfers are content-free, names/sizes/hashes only), and
 a replay/export signed URL, though single-object, ciphertext-only, and
-5-minutes short, cannot be revoked within its lifetime.
+5-minutes short, cannot be revoked within its lifetime. Forwarded
+port-forward/X11 traffic is the inverse case: never captured at all,
+metadata only (see the forwarding section above).
 
 ### Tier-0 hardening has enumerated residuals
 

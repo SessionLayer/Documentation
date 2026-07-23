@@ -141,13 +141,18 @@ recording failure under strict mode. The `endReason` vocabulary is
 
 `sftp`/`scp` refusals with an explicit channel error mean the capability
 wasn't granted — by then you're authorized, so the error is allowed to be
-specific ([RBAC](../admin-guides/rbac.md)). Port forwarding and X11 channels
-are refused by the Gateway in this release regardless of policy, and agent
-forwarding is refused always, everywhere, by design — granting those
-capabilities does not stop the refusal. With `ControlMaster` multiplexing,
-each new channel re-checks capability/expiry/locks locally — a channel
-refusal in a long-lived master connection often means policy changed under
-it.
+specific ([RBAC](../admin-guides/rbac.md)). Port-forward and X11 refusals
+are deliberately plainer — a channel-open or request failure with no reason
+detail — so check the rule grants the matching capability
+(`port_forward_local`, `port_forward_remote`, `x11`) before debugging the
+network; a granted `-L` can also fail because the **node** dials the target
+and cannot reach it. In ProxyJump mode every `direct-tcpip` channel *is* the
+jump hop, so `-L` is structurally unavailable there regardless of any grant.
+Agent forwarding is refused always, everywhere, by design — granting
+`agent_forward` does not stop the refusal. With `ControlMaster`
+multiplexing, each new channel re-checks capability/expiry/locks locally — a
+channel refusal in a long-lived master connection often means policy changed
+under it.
 
 ## Where the evidence lives
 

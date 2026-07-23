@@ -15,10 +15,10 @@ in context; every other page uses them consistently.
 - **break-glass** — the always-available emergency access model, independent of your IdP: a
   registered FIDO2 key or a pre-issued offline code. Using it fires an alert immediately, forces
   strict recording, and requires a post-hoc review. A lock still beats it.
-- **capability** — one policy-gated thing a session may do: `shell`, `exec`, `sftp`, `scp`. The
-  vocabulary also reserves port forwarding and X11 (accepted in policy, but the Gateway does not
-  admit those channels in this release) and agent forwarding (never admitted, by design). Rules and
-  grants name the capabilities they allow.
+- **capability** — one policy-gated thing a session may do: `shell`, `exec`, `sftp`, `scp`,
+  `port_forward_local`, `port_forward_remote`, `x11`. The vocabulary also names agent forwarding
+  (`agent_forward`), which is never admitted, by design. Rules and grants name the capabilities
+  they allow.
 - **compliance mode** — the stricter WORM flavor: the recording object is truly un-deletable until
   retention expires; even a governance delete is refused. Contrast with governance mode.
 - **Control Plane** — the Java management component: the REST API, policy and identity storage

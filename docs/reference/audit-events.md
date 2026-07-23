@@ -144,6 +144,26 @@ clone-detection signal at renewal time, and an unreviewed break-glass activation
 | `recording.delete` | A governance delete erased the encrypted object. |
 | `recording.prune` | Retention pruned an expired recording. |
 
+### In-session channel activity (lands at finalize)
+
+The Gateway reports per-channel audit facts with the recording finalization,
+so these events land when the session ends, not live — `occurredAt` is the
+batch's arrival, not the moment the channel opened. All three are metadata
+only; content is never captured.
+
+| Action | Emitted when |
+|---|---|
+| `sftp.<operation>` | One per decoded file-transfer operation (`sftp.write`, `sftp.read`, `sftp.rename`, …) — path, direction, size, and a content SHA-256 in the detail; never the content itself. |
+| `port_forward.closed` | One per admitted port-forward tunnel — `capability` (`port_forward_local` or `port_forward_remote`), `direction`, `target` (`host:port`), `bytes_in`, `bytes_out`, and `duration_seconds` in the detail; never the forwarded bytes. |
+| `x11_forward.closed` | One per admitted X11 tunnel — same detail shape, minus `target` (X11 has no client-supplied one). |
+
+Each tunnel gets exactly one `.closed` event, deliberately not an
+`.opened`/`.closed` pair: the batch arrives at finalize, and a synthesized
+`.opened` stamped with its arrival time would dress a batch fact up as a
+live signal that does not exist. Live channel facts are in the Gateway's
+structured log as they happen, and the sealed session recording carries
+tamper-evident open/close markers for each tunnel.
+
 ### Configuration changes
 
 Every config write is audited with before/after state in the detail. The pattern is
