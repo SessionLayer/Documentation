@@ -163,6 +163,7 @@ live in [session-limit policies](api.md).
 | `sessionlayer.jit.approval-window` | duration | `PT30M` | How long a request may sit pending before it expires unapproved. |
 | `sessionlayer.jit.max-grant-ttl` | duration | `PT8H` | Cluster ceiling on a JIT grant's TTL (`min` of the policy's TTL and this). The grant clock starts at final approval. |
 | `sessionlayer.jit.revoke-lock-ttl` | duration | `PT120S` | Bounded lifetime of the strict lock a revoke emits — its only job is tearing down the live session; the revoked state itself blocks re-authorization. |
+| `sessionlayer.jit.lookup-timeout` | duration | `PT0.15S` | Bounds the usable-grant lookup Authorize now runs on every connect. A timeout degrades to "no usable grant" (never widens access) instead of a fleet-wide fail-closed deny if the JIT-request table is degraded. |
 | `sessionlayer.jit.expiry.enabled` | boolean | `true` | Runs the scheduled sweep that expires overdue requests. |
 | `sessionlayer.jit.expiry.interval` | duration | `PT5M` | Cadence of the expiry sweep. |
 
