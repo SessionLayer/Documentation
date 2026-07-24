@@ -103,18 +103,31 @@ field is for the audit trail.
 
 ## What an approved grant actually is
 
-An approved request becomes a time-boxed allow that flows through the **same
-deny-overrides engine** as standing rules — as a second pass, only when
-standing rules alone found no allow. That design has two consequences worth
-knowing:
+An approved, in-window request becomes a time-boxed allow that is folded into
+the **same deny-overrides evaluation** as standing rules — a true **union**,
+checked on every connect regardless of whether standing access already
+matches something. A JIT grant only ever *adds* access on top of standing; it
+never replaces or narrows it, and it is never consulted in isolation. Two
+consequences worth knowing:
 
 - A JIT grant can never override an explicit deny rule or a
   [lock](locks.md). "Approved" does not beat "denied" — a locked target
   refuses a JIT session even with a fresh approval in hand, and this holds
-  even for zero-level auto-approved chains.
-- The session's `grant_expiry` is the minimum of the remaining grant TTL and
-  the credential TTL, and the Gateway enforces it mid-session per the access
-  model's expiry mode — an approved hour means an hour.
+  even for zero-level auto-approved chains, and even when standing access
+  would otherwise have covered part of the request.
+- A grant is only marked used (`APPROVED` → `ACTIVE`) when it actually
+  **contributed** to a connect — i.e. the connect would have been denied, or
+  granted fewer capabilities, without it. Requesting or holding an approved
+  grant "just in case" does not burn it: if standing access already covers
+  everything the connect needs, the grant is left untouched, `APPROVED`, and
+  available for a later connect that genuinely needs it. The audit trail
+  records `accessModel = jit` only for a connect the grant was actually
+  load-bearing for.
+- The session's `grant_expiry` is the minimum of every contributing rule's
+  remaining TTL (standing and JIT alike) and the credential TTL, and the
+  Gateway enforces it mid-session per the access model's expiry mode — an
+  approved hour means an hour, even if a standing rule for the same login
+  carries a much longer one.
 
 ## Revoking a live grant
 
