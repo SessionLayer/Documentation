@@ -1,0 +1,166 @@
+# JIT access
+
+Just-in-time (JIT) access replaces standing privileges with time-boxed grants
+that someone else approves. This guide shows you how to define what is
+requestable, how the approval chain works, and how to revoke a grant,
+including tearing down a session that is already live.
+
+If you're the person requesting access, see
+[Requesting access](../user-guide/requesting-access.md) instead.
+
+## Prerequisites
+
+- [ ] Data-plane basics in place: nodes labeled, [RBAC](rbac.md) understood.
+- [ ] `settings:write` to create JIT policies, `request:approve` to
+      approve/deny/revoke. Examples use a bearer token in `$TOKEN`
+      ([Authentication](authentication.md)).
+
+## Define what is requestable: JIT policies
+
+A JIT policy scopes requests: which nodes, which capabilities, how long, and
+who must approve.
+
+```bash
+curl -s https://cp.example.com/v1/jit-policies \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: jitpol-prod-web-1" \
+  -d '{
+    "name": "prod-web-emergency",
+    "targetSelector": { "env": { "op": "eq", "value": "prod" }, "role": { "op": "eq", "value": "web" } },
+    "capabilities": ["shell", "exec"],
+    "maxTtlSeconds": 3600,
+    "approvalChain": [
+      { "kind": "oidc_group", "value": "sre-oncall" },
+      { "kind": "email", "value": "alice@example.com" }
+    ]
+  }'
+```
+
+The approval chain is 0 to 3 levels; each level is satisfiable by a named
+email identity or by any member of an SSO/OIDC group. A zero-level chain
+auto-approves, useful for low-risk targets where you want the time-box and
+the audit trail without a human gate.
+
+## The request lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> REQUESTED: submitted (with reason)
+    REQUESTED --> PENDING_APPROVAL: chain has levels
+    REQUESTED --> APPROVED: zero-level chain (auto-approve)
+    PENDING_APPROVAL --> APPROVED: all levels approve
+    PENDING_APPROVAL --> DENIED: any approver denies
+    PENDING_APPROVAL --> EXPIRED: approval window elapses
+    APPROVED --> ACTIVE: first use
+    APPROVED --> EXPIRED: grant TTL elapses
+    ACTIVE --> EXPIRED: grant TTL elapses
+    ACTIVE --> REVOKED: admin revokes
+```
+
+Two independent clocks govern it:
+
+- The approval window (default 30 minutes): the request must collect all
+  approvals before it elapses, or it expires. A late approval cannot
+  resurrect it.
+- The grant TTL: starts at final approval, capped at `min(policy
+  maxTtlSeconds, 8 hours)`. The policy's cap is snapshotted at submit time,
+  so editing or deleting the policy later never widens an in-flight request.
+
+Every transition, request, each approval, denial, expiry, activation,
+revocation, and every rejected attempt, lands in the correlated
+[audit stream](audit.md).
+
+## Approving and denying
+
+Pending requests are visible in the Dashboard's JIT screen and via the API:
+
+```bash
+curl -s "https://cp.example.com/v1/jit-requests?state=PENDING_APPROVAL" \
+  -H "Authorization: Bearer $TOKEN"
+
+# REQUEST_ID is the id of the pending request from the list above.
+curl -s https://cp.example.com/v1/jit-requests/$REQUEST_ID/approve \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "reason": "change window CH-5678" }'
+```
+
+Approval rules, enforced as hard server-side invariants:
+
+- Self-approval is impossible. The approver can never be the requester,
+  checked before any level match, so no chain configuration, group
+  membership, or ordering trick lets someone approve their own request.
+- One approver, one act. An approver may act at most once per request, so a
+  two-level chain requires two distinct humans.
+- Approvers need the `request:approve` platform permission and must match the
+  pending level (be the named email, or belong to the named group).
+
+Denial (`POST .../deny`) is terminal. The requester sees the state change;
+they do not learn which approver denied unless you tell them. The reason
+field is for the audit trail.
+
+## What an approved grant actually is
+
+An approved, in-window request becomes a time-boxed allow that is folded into
+the same deny-overrides evaluation as standing rules, a true union, checked
+on every connect regardless of whether standing access already matches
+something. A JIT grant only ever adds access on top of standing; it never
+replaces or narrows it, and it is never consulted in isolation. Two
+consequences worth knowing:
+
+- A JIT grant can never override an explicit deny rule or a
+  [lock](locks.md). "Approved" does not beat "denied": a locked target
+  refuses a JIT session even with a fresh approval in hand, and this holds
+  even for zero-level auto-approved chains, and even when standing access
+  would otherwise have covered part of the request.
+- A grant is only marked used (`APPROVED` to `ACTIVE`) when it actually
+  contributed to a connect, meaning the connect would have been denied, or
+  granted fewer capabilities, without it. Requesting or holding an approved
+  grant "just in case" does not burn it: if standing access already covers
+  everything the connect needs, the grant is left untouched, `APPROVED`, and
+  available for a later connect that genuinely needs it. The audit trail
+  records `accessModel = jit` only for a connect the grant was actually
+  load-bearing for.
+- The session's `grant_expiry` is the minimum of every contributing rule's
+  remaining TTL (standing and JIT alike), the cluster grant ceiling
+  `sessionlayer.authz.max-grant-ttl`, and the identity's resolved max duration.
+  The full set of terms is in
+  [Session limits](session-limits.md#what-bounds-a-sessions-duration). The
+  Gateway enforces the result mid-session per the access model's expiry mode:
+  an approved hour means an hour, even if a standing rule for the same login
+  carries a much longer one.
+- The grant carries no source-IP condition. It is evaluated as its own allow,
+  so a `permit_cidrs` narrowing you placed on a standing allow rule to the
+  same node does not constrain where a JIT connect may come from. A location
+  control that has to bind the JIT path belongs at the Gateway's
+  `ssh.source_ip_allowlist`, which runs before any of this. See
+  [the source-IP condition](rbac.md).
+
+## Revoking a live grant
+
+```bash
+curl -s https://cp.example.com/v1/jit-requests/$REQUEST_ID/revoke \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "reason": "change aborted" }'
+```
+
+Revocation flips the request to `REVOKED` (blocking any new session) and
+pushes a short-lived lock scoped to the grantee's identity, which tears down
+the live session on every Gateway, fail-closed, within the lock propagation
+window (lock TTL default 120 seconds, `sessionlayer.jit.revoke-lock-ttl`).
+
+> **Note:** because the teardown lock is identity-scoped, the revoked user's
+> other live sessions are also interrupted during that short window. That is
+> the deliberate trade: teardown must not depend on per-session state that a
+> Gateway might not have.
+
+## Next
+
+- [Break-glass access](break-glass.md): when there is no time for an
+  approval chain.
+- [Locks](locks.md): the mechanism revocation rides on.
+- [Requesting access](../user-guide/requesting-access.md): the requester's
+  side of this flow.
+- [Audit](audit.md): reconstructing approve, connect, and run for any grant.

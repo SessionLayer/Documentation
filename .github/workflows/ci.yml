@@ -1,0 +1,32 @@
+name: ci
+
+# `push:` is unqualified on purpose. Scoping it to `[main]` means a feature
+# branch runs NO ci at all -- not a failing run, none -- so `gh run list` comes
+# back empty, which reads like "not finished yet" rather than "never
+# scheduled", and work sits on the branch looking fine until a pr exists.
+# This repo merges last, which is exactly when a late red is most expensive.
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Documentation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: markdownlint
+        run: npm exec --yes -- markdownlint-cli2@0.18.1
+
+
+
+
+
+
+
+

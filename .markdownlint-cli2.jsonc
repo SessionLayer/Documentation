@@ -1,0 +1,17 @@
+{
+  // Deviations from the defaults, each with its reason inline below.
+  "config": {
+    "default": true,
+    // Prose wraps naturally; long link/table lines are not defects.
+    "MD013": false,
+    // Same H2 (e.g. "Next") may repeat across sibling sections, never nested.
+    "MD024": { "siblings_only": true },
+    "MD004": { "style": "dash" },
+    "MD046": { "style": "fenced" },
+    // Landing README uses bold lead-ins for the value bullets.
+    "MD036": false
+  },
+  "globs": ["**/*.md"],
+  // product/ is where CI checks out the source-of-truth repos for the drift gates.
+  "ignores": ["node_modules/**", "product/**"]
+}
