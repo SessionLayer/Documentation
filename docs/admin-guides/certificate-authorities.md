@@ -152,11 +152,10 @@ CA ever returns private material.
 
 > **Note:** the export projects the CA's stored public key, present for every
 > backend that signs. Adopting a key service persists the public half it fetched
-> at rotation time, the same column a `local` CA's key populates. If a database
-> carries a `vault`-backend row from before this build's gate existed, no key was
-> ever provisioned for it, so this returns `404` for that kind, and that CA
-> cannot sign either. Rotate it, naming a backend that signs, to bring the kind
-> back onto a key that works.
+> at rotation time, the same column a `local` CA's key populates. A
+> `vault`-backend row has no key provisioned for it, so this returns `404` for
+> that kind, and that CA cannot sign either. Rotate it, naming a backend that
+> signs, to bring the kind back onto a key that works.
 
 The internal mTLS CA is not served here. It is an X.509 trust anchor rather
 than an SSH CA, and it has its own export at `/v1/cas/mtls/trust-anchor` (see
@@ -265,7 +264,9 @@ internal mTLS CA cannot be adopted this way: it is absent from `/v1/cas`, and
 its key stays on `local` for the deployment's lifetime.
 
 Throughout this section, replace `eu-west-1` with your region, `111122223333`
-with your AWS account id, and `cp.example.com` with your Control Plane.
+with your AWS account id, and `cp.example.com` with your Control Plane. The
+worked example adopts the `session` CA; substitute `user` or `host` to adopt a
+different kind.
 
 Create an asymmetric signing key on P-256. That is the only key spec this
 backend accepts, whatever the CA's current algorithm:
@@ -338,12 +339,12 @@ sessionlayer.ca.aws.region=eu-west-1
 sessionlayer.ca.aws.account-id=111122223333
 ```
 
-Those three, with `partition` (default `aws`), are an allow-list anchor rather
-than connection details: a `keyReference` naming any other account, region or
-partition is refused, so a `config.ca_config` row written by a compromised
-database cannot redirect signing to an account an attacker controls. The
-Control Plane fails to start if any of them is missing or malformed while
-`enabled=true`. See
+`region` and `account-id`, with `partition` (default `aws`), are an allow-list
+anchor rather than connection details: a `keyReference` naming any other
+account, region or partition is refused, so a `config.ca_config` row written by
+a compromised database cannot redirect signing to an account an attacker
+controls. The Control Plane fails to start if any of the three is missing or
+malformed while `enabled=true`. See
 [Control Plane configuration](../reference/config-control-plane.md) for the
 full property set.
 
@@ -396,8 +397,9 @@ different key, returns under a different algorithm, or returns in the wrong
 encoding fails closed at the point of signing, rather than becoming a
 certificate no node accepts.
 
-Now redistribute trust. Adoption is a rotation onto a new key, so the fleet has
-to learn the CA's new public half before the outgoing one drains. Export it:
+Now redistribute trust. Adoption is a rotation onto a new key, so every node
+has to trust the CA's new public half before the outgoing one drains. Export
+it:
 
 ```bash
 curl -s https://cp.example.com/v1/cas/session/public-key \
@@ -408,17 +410,12 @@ curl -s https://cp.example.com/v1/cas/session/public-key \
 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBExampleOnlyNotARealKey= sessionlayer-session-ca
 ```
 
-Put that line in every node's `TrustedUserCAKeys` file, alongside the outgoing
-key rather than replacing it, and only then drain. Both keys verify during the
-overlap, so no session is refused while distribution is in flight. The
-mechanics are the same for every backend and are covered under
-[Rotation](#rotation-overlap-then-drain) below.
-
-> **Warning:** the platform cannot see whether your trust distribution
-> finished, and the certificates it signs after the rotation are already the
-> new key's. A `session` CA promoted to `active` on a KMS key that no node yet
-> trusts breaks every new session on the fleet at once, with nothing failing on
-> the Control Plane side to tell you. Distribute first, drain last.
+Add that line to every node's `TrustedUserCAKeys` file alongside the outgoing
+key rather than replacing it. Both keys verify through the overlap, so no
+session is refused while distribution is in flight, and the certificates the
+Control Plane signs from here on are already the new key's.
+[Rotation](#rotation-overlap-then-drain) below has the sequencing and what the
+platform cannot check for you.
 
 A failed adoption never touches the active CA. The incoming key is provisioned
 in full before the transaction that promotes it, so every case below leaves the

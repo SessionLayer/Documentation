@@ -137,12 +137,15 @@ blocks that long by design rather than hang half-ready.
 
 ## 3. CA backends: `local`, and a key service for the three SSH CAs
 
-| Backend | Signs on the shipped build | Turned on by |
+Three of the four backends sign on the shipped build, and each key service stays
+off until you configure it.
+
+| Backend | Signs | Configured by |
 |---|---|---|
-| `local` | yes | nothing; every CA starts here at cold start |
+| `local` | yes | nothing to set; every CA starts here at cold start |
 | `azure_keyvault` | yes | `sessionlayer.ca.azure.*` |
 | `aws_kms` | yes | `sessionlayer.ca.aws.*` |
-| `vault` | no | nothing in this build implements the interface it consumes |
+| `vault` | no | not implemented in this build |
 
 > **Warning:** `vault` still refuses `POST /v1/cas` and `PUT /v1/cas/{caId}`
 > with a `422` saying the backend has no signer in this build. There is no

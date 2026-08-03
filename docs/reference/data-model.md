@@ -94,8 +94,8 @@ is deliberate:
   `vault` is a seam whose classes consume an interface nothing in this build implements, so the
   write path refuses it with a `422` and the signer path fails closed on it, asking one shared
   predicate rather than two lists that could drift. The CHECK keeps all four because a deployment
-  may already hold a `vault` row from before that gate, and narrowing it would fail at startup on
-  exactly that deployment.
+  may already hold a `vault` row, and narrowing it would fail at startup on exactly that
+  deployment.
 
 - `ca_config.algorithm`. Only the three ECDSA curves can be assembled into a signer, so
   `POST`/`PUT /v1/cas` rejects `ed25519`, `rsa-2048` and `rsa-4096` with a `422`, and rejects a

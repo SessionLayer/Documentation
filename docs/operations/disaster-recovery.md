@@ -492,7 +492,7 @@ exists, then redistribute trust" is.
 | The KMS key was disabled | fails closed at the next certificate | yes: re-enable the key |
 | The KMS key is pending deletion | fails closed at the next certificate | yes, until the waiting period elapses: `aws kms cancel-key-deletion` |
 | The KMS key was deleted, or its account or region is gone for good | fails closed at the next certificate | the key, never. The CA, yes: rotate onto a new key |
-| The Control Plane database was lost, KMS intact | resumes with the restored database | yes, and with no fleet change: the CA's public half comes back with the row, and it still matches the key in KMS |
+| The Control Plane database was lost, KMS intact | stops with the Control Plane | yes, and with no fleet change: the CA's public half is restored with the row and still matches the key in KMS |
 
 The first three are access incidents rather than key loss. The key material is
 untouched, the CA's pinned public key still matches it, and signing resumes the

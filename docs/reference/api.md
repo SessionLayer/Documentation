@@ -459,8 +459,8 @@ and read-only here.
 The `backend` set is wider than what can sign. `local`, `aws_kms` and `azure_keyvault` resolve to a
 signer; `vault` is refused at validation with a `422` saying the backend has no signer in this
 build. The write path and the signer path ask the same question, so a backend the API accepts is one
-that can issue. A row stored before that gate existed still cannot sign, and fails at the first
-signature instead. Each key-service backend additionally constrains its `keyReference`, checked at
+that can issue. A stored row naming a backend that cannot sign still reads back, and fails at the
+first signature instead. Each key-service backend additionally constrains its `keyReference`, checked at
 the same validation step: `azure_keyvault` requires a fully versioned Key Vault identifier, and
 `aws_kms` a key ARN in the configured account, region and partition (never an alias, never a bare
 key id). Either is a `422` on a Control Plane that has not configured that backend. See
