@@ -426,14 +426,16 @@ CA exactly as it was and can be retried once the cause is fixed:
 | `keyReference` is an alias, a bare key id, or names another account, region or partition | `422` naming the rule it broke |
 | `sessionlayer.ca.aws.enabled` is not set on this Control Plane | `422` naming that property |
 | `algorithm` is `ecdsa-p384` or `ecdsa-p521` | `422`: `aws_kms` produces `ecdsa-p256` only |
-| The key is not `ECC_NIST_P256`/`SIGN_VERIFY`, or does not offer `ECDSA_SHA_256` | the rotation fails; the log names the key ARN and what the key actually is |
+| The key is not `ECC_NIST_P256`/`SIGN_VERIFY`, or does not offer `ECDSA_SHA_256` | the rotation fails; the log names the key and what it actually is |
 | The role lacks `kms:GetPublicKey`, or the key is disabled or pending deletion | the rotation fails on the KMS refusal |
 | KMS does not answer within `sessionlayer.ca.provision-timeout` | the rotation is refused rather than left waiting on KMS |
 
 The first three are validation, refused before a single KMS call, and the
 reason comes back in the response body. The last three happen at the KMS call
 itself; the response is a server error and the reason is in the Control Plane's
-log, so read it there before retrying.
+log, so read it there before retrying. Anywhere the Control Plane names the key
+back to you, the account id is masked (`arn:aws:kms:eu-west-1:***:key/...`), so
+match on the key id rather than the whole string.
 
 ## Rotation: overlap, then drain
 
