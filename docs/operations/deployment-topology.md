@@ -182,7 +182,8 @@ who dials and when you need the rule.
 | owner Gateway → ingress Gateway `/peer/v1/relay` | mutual TLS 1.3 plus a single-use token bound to node, session, gateway, principal and expiry | HA, agent nodes only |
 | Gateway → coordination bus | none from the built-in client; supply TLS and subject authorization at the broker | HA |
 | Control Plane → object store | your object-store credentials | every deployment; presigns upload, replay and export URLs, and runs retention |
-| Control Plane → Azure Key Vault | your Key Vault credentials | any deployment that has adopted `azure_keyvault` for a SSH CA — see [Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca) |
+| Control Plane → Azure Key Vault | your Key Vault credentials | any deployment that has adopted `azure_keyvault` for a SSH CA; see [Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca) |
+| Control Plane → AWS KMS | whatever the standard AWS credential chain resolves (IRSA, an instance profile, a profile) | any deployment that has adopted `aws_kms` for a SSH CA; see [Certificate authorities](../admin-guides/certificate-authorities.md#adopt-aws-kms-for-a-ca) |
 | Control Plane → Postgres | your database credentials | every deployment |
 | Control Plane → your IdP | your OIDC client credentials | every deployment using OIDC login |
 | browser → Control Plane REST API | OIDC auth-code with PKCE, then a bearer token | every deployment |

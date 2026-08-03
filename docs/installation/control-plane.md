@@ -110,10 +110,10 @@ sessionlayer.ca.local.kek-base64=<your-kek>
 > Every CA starts on `local` at cold start, so set a real KEK regardless of
 > what you do afterward. The internal mTLS CA cannot move off `local` at all,
 > so this KEK always protects it; the three SSH CAs (`user`/`session`/`host`)
-> can later be adopted onto Azure Key Vault, at which point their keys leave
-> the database entirely. Take the KEK from your secrets manager and keep it
-> out of the database's backup path. See
-> [Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca).
+> can later be adopted onto Azure Key Vault or AWS KMS, at which point their
+> keys leave the database entirely. Take the KEK from your secrets manager and
+> keep it out of the database's backup path. See
+> [Certificate authorities](../admin-guides/certificate-authorities.md).
 
 ## Run it
 

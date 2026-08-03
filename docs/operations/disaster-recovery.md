@@ -356,27 +356,29 @@ what each one signs and how rotation works; this table is the incident view.
 | `mtls` | An attacker mints a decision-context signing leaf and forges signed authorization decisions, and impersonates the Control Plane to every Gateway and Agent that pins this CA. It cannot mint anything a node accepts; that is the session CA's job. | The Control Plane will not start: it mints its own gRPC server certificate from this CA at every boot and aborts fail-closed if it cannot. | Not reachable through `/v1/cas`. See [Rebuild the internal mTLS CA](#rebuild-the-internal-mtls-ca). |
 
 > **Note:** the `user`/`session`/`host` rows above assume the `local` backend, still the default.
-> A CA adopted onto `azure_keyvault`
-> ([Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca))
-> has a different story in both columns: the private key cannot leak through a Control Plane or
-> database compromise, because it never leaves the vault. "Only lost" then means the vault is
-> unreachable or the key version was deleted, not a misplaced key-encryption key, and recovery is
-> bounded by your vault's own soft-delete and purge-protection settings rather than by anything the
-> Control Plane holds. Check `GET /v1/cas` (`backend`) before applying either column. The `mtls`
-> row is unaffected: that CA cannot move to Key Vault.
+> A CA adopted onto `aws_kms` or `azure_keyvault`
+> ([Certificate authorities](../admin-guides/certificate-authorities.md)) has a different story in
+> both columns: the private key cannot leak through a Control Plane or database compromise, because
+> it never leaves the key service. "Only lost" then means the key service is unreachable, its
+> credential no longer grants signing, or the key itself was deleted, not a misplaced
+> key-encryption key. Recovery is bounded by that service's own deletion protections rather than by
+> anything the Control Plane holds: Key Vault's soft-delete and purge protection, KMS's deletion
+> waiting period. Check `GET /v1/cas` (`backend`) before applying either column, and see
+> [Losing a KMS-held CA key](#losing-a-kms-held-ca-key). The `mtls` row is unaffected: that CA
+> cannot move off `local`.
 
 In every leak case, lock before you replace the key. A
 [lock](../admin-guides/locks.md) is immediate and un-overridable; the new key
 is the durable fix that follows it.
 
-Rotation is the call that replaces the key, and this build signs with `local`
-and `azure_keyvault`. If a database carried from an older deployment holds a
-CA on `aws_kms` or `vault`, that CA already cannot sign, and rotating it does
-not self-heal by default: an empty rotate body inherits the CA's current
+Rotation is the call that replaces the key, and this build signs with `local`,
+`aws_kms` and `azure_keyvault`. If a database carried from an older deployment
+holds a CA on `vault`, that CA already cannot sign, and rotating it does not
+self-heal by default: an empty rotate body inherits the CA's current
 (non-signing) backend and is refused with the same `422` the write path gives.
-Name the backend explicitly — `{"backend": "local"}`, or adopt Key Vault — to
-bring the kind back onto a key that works. See
-[Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca).
+Name the backend explicitly, `{"backend": "local"}` or one of the key-service
+adoptions, to bring the kind back onto a key that works. See
+[Certificate authorities](../admin-guides/certificate-authorities.md).
 
 ### What rotation does and does not fix
 
@@ -399,12 +401,13 @@ landed, and rely on the lock for the interval in between.
 > reference, and algorithm the active CA already has — it is not a way to
 > change any of the three. `backend`, `keyReference`, and `algorithm` are real,
 > validated overrides for the incoming key, checked before anything is
-> written: naming a backend this build has no signer for, or a Key Vault
-> reference that is unversioned or names a different vault, is a `422` and the
-> CA is untouched. Moving a CA onto `azure_keyvault`, or a genuinely compromised
-> Key Vault key onto a new version, both require naming the new
-> `backend`/`keyReference` explicitly in the request; re-sending an empty body
-> against a Key Vault CA re-adopts the exact version it already points to.
+> written: naming a backend this build has no signer for, a Key Vault reference
+> that is unversioned or names a different vault, or a KMS reference that is an
+> alias or names a different account, is a `422` and the CA is untouched.
+> Adopting a key service, and moving a compromised key onto a new key version or
+> a new key ARN, both require naming the new `backend`/`keyReference` explicitly
+> in the request; re-sending an empty body against a key-service CA re-adopts
+> the exact key it already points to.
 
 ### Rebuild the internal mTLS CA
 
@@ -457,21 +460,78 @@ The `local` CA rebuild is the same shape as the mTLS one, applied to every CA
 still on `local`, and it is a fleet rebuild rather than a rotation: a `local`
 session, user, or host CA means redistributing `TrustedUserCAKeys` and
 `@cert-authority` to every node and client, on top of re-enrolling every
-component. Any SSH CA already adopted onto `azure_keyvault` is unaffected —
-its key was never wrapped under the KEK, so losing the KEK cannot touch it.
+component. Any SSH CA already adopted onto `aws_kms` or `azure_keyvault` is
+unaffected: its key was never wrapped under the KEK, so losing the KEK cannot
+touch it.
 
 > **Warning:** `sessionlayer.ca.local.allow-dev-kek=true` is not a recovery
 > path. The built-in dev KEK is a public constant and unwraps only keys that
 > were wrapped under it, so setting it recovers nothing and makes any key
 > subsequently wrapped under it readable by anyone holding the database.
 
-Adopting Key Vault for a SSH CA is what shrinks this blast radius: that CA's
-private key is never in the database at all, so losing the KEK cannot reach
-it. The internal mTLS CA cannot be adopted, so it always sits in the database
-under the KEK regardless of what you have done with the three SSH CAs — which
-is what makes the KEK the platform's most sensitive secret, and why it belongs
-somewhere the database's backups do not reach. See
+Adopting a key service for a SSH CA is what shrinks this blast radius: that
+CA's private key is never in the database at all, so losing the KEK cannot
+reach it. The internal mTLS CA cannot be adopted, so it always sits in the
+database under the KEK regardless of what you have done with the three SSH CAs.
+That is what makes the KEK the platform's most sensitive secret, and why it
+belongs somewhere the database's backups do not reach. See
 [Production hardening](../security/hardening.md).
+
+### Losing a KMS-held CA key
+
+A CA adopted onto `aws_kms` has no private key in any backup, by construction.
+The Control Plane stores the key ARN and the public half; the private half has
+never existed outside KMS and cannot be exported from it. Nothing you restore
+brings that key back, and nothing leaked from a database or a KEK gives it
+away. "Recover the key" is not an operation here. "Rotate onto a key that
+exists, then redistribute trust" is.
+
+| What happened | Effect on signing | Recoverable |
+|---|---|---|
+| The role's `kms:Sign` grant was removed or narrowed | fails closed at the next certificate | yes: restore the grant, nothing was lost |
+| The KMS key was disabled | fails closed at the next certificate | yes: re-enable the key |
+| The KMS key is pending deletion | fails closed at the next certificate | yes, until the waiting period elapses: `aws kms cancel-key-deletion` |
+| The KMS key was deleted, or its account or region is gone for good | fails closed at the next certificate | the key, never. The CA, yes: rotate onto a new key |
+| The Control Plane database was lost, KMS intact | resumes with the restored database | yes, and with no fleet change: the CA's public half comes back with the row, and it still matches the key in KMS |
+
+The first three are access incidents rather than key loss. The key material is
+untouched, the CA's pinned public key still matches it, and signing resumes the
+moment access is back, with nothing to redistribute. Sessions already running
+are undisturbed throughout; it is new sessions that stop, because the session
+CA gates them.
+
+A deleted key is the one that does not come back once its waiting period has
+elapsed, and an account or region you have permanently lost has the same
+effect. Recovery is a rotation onto a key that exists, followed by the trust
+redistribution any rotation needs:
+
+```bash
+# CA_ID from GET /v1/cas; the keyReference is the replacement key's ARN.
+curl -s -X POST https://cp.example.com/v1/cas/$CA_ID/rotate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: recover-session-ca-2026q3" \
+  -d '{
+        "backend": "aws_kms",
+        "keyReference": "arn:aws:kms:eu-west-1:111122223333:key/1a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d",
+        "algorithm": "ecdsa-p256"
+      }'
+```
+
+> **Warning:** the replacement key has to be in the account, region and
+> partition named by `sessionlayer.ca.aws.*`, because the ARN is checked against
+> them and that anchor is process configuration no database row can override.
+> Recovering into another region therefore means changing that configuration and
+> restarting the Control Plane before the rotation, and a multi-Region key is not
+> an escape from it: a replica's ARN names its own region. Work the restart into
+> the plan rather than discovering it mid-incident.
+
+If no KMS key is reachable at all and sessions are down, `{"backend": "local"}`
+provisions a fresh key in the database under the KEK and gets the fleet signing
+again on the same overlap-then-drain terms. Adopt KMS again once the account is
+back. Either way the fleet's `TrustedUserCAKeys` has to learn the new public
+half before the outgoing key drains, and the platform cannot check that for
+you.
 
 ## Recording-store loss against customer-key loss
 

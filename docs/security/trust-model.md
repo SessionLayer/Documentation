@@ -30,7 +30,7 @@ real, and this page states it rather than papering over it.
 
 | Component | Public surface | Sees SSH plaintext? | Holds long-lived secrets? |
 |---|---|---|---|
-| Control Plane | HTTPS: API, Dashboard-facing endpoints, OIDC pages | No, never | CA key references (private keys live in the database under a KEK, or in Azure Key Vault for the three SSH CAs); no session keys |
+| Control Plane | HTTPS: API, Dashboard-facing endpoints, OIDC pages | No, never | CA key references (private keys live in the database under a KEK, or in Azure Key Vault or AWS KMS for the three SSH CAs); no session keys |
 | Gateway | SSH (users), WSS (agents) | Yes, the only component that does | its own renewable mTLS identity; per-session keys that never persist |
 | Agent | none (outbound only) | No (it splices ciphertext) | its renewable mTLS identity |
 

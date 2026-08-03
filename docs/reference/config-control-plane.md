@@ -275,6 +275,7 @@ injects credentials from the environment.
 | `sessionlayer.ca.local.kek-base64` | string (base64) | none | The key-encryption key wrapping local-backend CA private keys. Production must set it (32 bytes, base64). |
 | `sessionlayer.ca.local.kek-reference` | string | none | An operator-visible label for the KEK in use. |
 | `sessionlayer.ca.local.allow-dev-kek` | boolean | `false` | Allows starting with the built-in dev KEK. Refused otherwise (fail closed). |
+| `sessionlayer.ca.provision-timeout` | duration | `PT10S` | Wall-clock bound on provisioning one incoming CA key during a rotation, whatever the backend. A key service that is slow rather than down makes the rotate call fail with a named refusal once this elapses, rather than hang. Independent of each backend's own HTTP timeouts, which cannot bound a response that trickles. |
 | `sessionlayer.coldstart.enabled` | boolean | `true` | Provisions operator settings and the three SSH CAs at startup, exactly once, idempotently. |
 | `sessionlayer.coldstart.timeout-seconds` | long | `60` | Bound on cold-start provisioning; a stuck provisioner crashes the boot rather than hanging it. |
 
@@ -290,11 +291,39 @@ the adoption procedure and the minimum Azure role.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `sessionlayer.ca.azure.enabled` | boolean | `false` | Whether the Azure Key Vault CA backend is configured on this Control Plane. Off, `azure_keyvault` is refused exactly like `aws_kms`/`vault`. |
+| `sessionlayer.ca.azure.enabled` | boolean | `false` | Whether the Azure Key Vault CA backend is configured on this Control Plane. Off, `azure_keyvault` is refused with a `422` naming this property. |
 | `sessionlayer.ca.azure.vault-uri` | string (URL) | none | The one vault this Control Plane signs in. Required when `enabled=true`; must be an absolute `https://` URL, or startup fails naming the property. A `keyReference` naming any other vault is refused — this is an allow-list anchor, not just a connection string. |
 | `sessionlayer.ca.azure.credential` | enum | `DEFAULT` | Which `azure-identity` credential builds the vault's token: `DEFAULT` (the standard Azure credential chain), `MANAGED_IDENTITY`, or `WORKLOAD_IDENTITY`. |
 | `sessionlayer.ca.azure.client-id` | string | none | Pins the managed/workload identity's client id, for a host with more than one attached. |
-| `sessionlayer.ca.azure.timeout` | duration | `PT10S` | Bounds two different things with one value: the HTTP client's connection and response timeout on every signing call, and, independently, the whole vault read at CA adoption/rotation. A vault that is slow rather than down makes a rotation onto (or within) `azure_keyvault` fail with a named refusal once this elapses, rather than hang. |
+| `sessionlayer.ca.azure.timeout` | duration | `PT10S` | The HTTP client's connection and response timeout on every call to the vault. The provisioning step of a rotation is bounded separately by `sessionlayer.ca.provision-timeout`. |
+
+## AWS KMS CA backend (`sessionlayer.ca.aws.*`)
+
+Adopts a `user`, `session`, or `host` CA onto AWS KMS; unset, every CA stays on `local`. See
+[Certificate authorities](../admin-guides/certificate-authorities.md#adopt-aws-kms-for-a-ca) for
+the adoption procedure and the minimum IAM policy.
+
+| Key | Type | Default | Effect |
+|---|---|---|---|
+| `sessionlayer.ca.aws.enabled` | boolean | `false` | Whether the AWS KMS CA backend is configured on this Control Plane. Off, `aws_kms` is refused with a `422` naming this property. |
+| `sessionlayer.ca.aws.region` | string | none | The region this Control Plane signs in. Required when `enabled=true`; matched against `[a-z0-9-]+`, or startup fails naming the property. |
+| `sessionlayer.ca.aws.account-id` | string | none | The AWS account the signing key lives in. Required when `enabled=true`; exactly 12 digits. |
+| `sessionlayer.ca.aws.partition` | enum | `aws` | `aws`, `aws-us-gov`, or `aws-cn`. |
+| `sessionlayer.ca.aws.endpoint-override` | string (URL) | none | Sends KMS calls to this endpoint instead of the region's. Must be an absolute `https://` URL with a host; `http://` is accepted only when `allow-insecure-endpoint=true`, and any other scheme never is. |
+| `sessionlayer.ca.aws.allow-insecure-endpoint` | boolean | `false` | Permits an `http` `endpoint-override`. Development and tests only. |
+| `sessionlayer.ca.aws.timeout` | duration | `PT10S` | Applied to the KMS client four ways: connection timeout, socket timeout, API-call timeout, and per-attempt timeout. The provisioning step of a rotation is bounded separately by `sessionlayer.ca.provision-timeout`. |
+
+`region`, `account-id` and `partition` are an allow-list anchor, not connection details: a
+`keyReference` naming any other account, region or partition is refused, so a `config.ca_config`
+row written by a compromised database cannot redirect signing to an account an attacker controls.
+There is no credential property. Credentials come from the standard AWS provider chain, so no
+secret, token or key material belongs in this configuration.
+
+> **Warning:** `sessionlayer.ca.aws.allow-insecure-endpoint=true` sends every KMS call, including
+> the CA's signing requests, over plaintext HTTP. It exists so a test deployment can point at a
+> local KMS emulator, and it is the only thing standing between a mistyped `endpoint-override`
+> scheme and an unencrypted signing path. Never set it in production; leave `endpoint-override`
+> unset there and let the SDK resolve the region's own endpoint.
 
 ## Next
 

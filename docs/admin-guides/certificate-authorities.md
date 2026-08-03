@@ -60,16 +60,16 @@ reserved for actual CA-key compromise, never a routine access-removal tool.
 
 ## Backends
 
-`local` and `azure_keyvault` sign in a shipped build. `aws_kms` and `vault`
-remain integration seams: the classes exist and are tested, but each consumes
+`local`, `aws_kms` and `azure_keyvault` sign in a shipped build. `vault`
+remains an integration seam: the classes exist and are tested, but they consume
 an interface that nothing in the release implements, and no bean constructs
-one. The write path refuses both of them with a `422`.
+one. The write path refuses it with a `422`.
 
 | Backend | Key lives in | Signer in a shipped build |
 |---|---|---|
 | `local` | the Control Plane's database, envelope-encrypted under a KEK | yes |
-| `aws_kms` | AWS KMS | no: `KmsSigner` seam, unimplemented |
-| `azure_keyvault` | Azure Key Vault | yes |
+| `aws_kms` | AWS KMS | yes, once `sessionlayer.ca.aws.*` names the account and region |
+| `azure_keyvault` | Azure Key Vault | yes, once `sessionlayer.ca.azure.vault-uri` names the vault |
 | `vault` | HashiCorp Vault's SSH engine | no: `VaultSshEngine` seam, unimplemented |
 
 The refusal is deliberate. A CA configured on a seam would take the write and
@@ -79,11 +79,11 @@ lookup, so the set the API accepts and the set that can sign cannot drift
 apart. Rows naming a seam stay readable, so a database carried from an older
 deployment still starts; those CAs cannot sign.
 
-`azure_keyvault` never falls back to `local`. A misconfigured or unreachable
-vault, a malformed or unversioned `keyReference`, or missing pinned public-key
-material each fail the signer lookup closed instead of quietly signing from
-the database; only a CA row actually naming `local` ever reaches the local key
-material.
+Neither key service ever falls back to `local`. An unreachable vault or KMS
+endpoint, a `keyReference` that is malformed for its backend, or missing pinned
+public-key material each fail the signer lookup closed instead of quietly
+signing from the database; only a CA row actually naming `local` ever reaches
+the local key material.
 
 Three algorithms are supported, all ECDSA: `ecdsa-p256` (the default and the
 portable choice every backend can produce), `ecdsa-p384`, and `ecdsa-p521`.
@@ -96,19 +96,18 @@ stored, as is an algorithm the chosen backend cannot produce.
 > such private key is in the Control Plane's database, envelope-encrypted
 > under the key-encryption key you supply in `sessionlayer.ca.local.kek-base64`.
 > Whoever holds the database and that key holds every CA you have not adopted
-> onto Key Vault. Supply a real KEK from your secrets manager, keep it out of
+> onto a key service. Supply a real KEK from your secrets manager, keep it out of
 > the database's backup path, and treat it as the platform's most sensitive
 > secret. The Control Plane fails closed at startup on the well-known dev KEK
 > without an explicit override. See [Production hardening](../security/hardening.md).
 
-Moving a SSH CA onto `azure_keyvault` is a configuration change plus a
-rotation: see [Adopt Key Vault for a CA](#adopt-key-vault-for-a-ca) below.
-`aws_kms` and `vault` remain build steps: bind your SDK against the
-`KmsSigner` or `VaultSshEngine` interface, and the backend it belongs to
-becomes writable and signable in that build. Signature normalization, the
-per-backend algorithm table and the fail-closed contract are already
-implemented on this side of each seam; the call to your key service is the
-missing piece.
+Moving a SSH CA onto a key service is a configuration change plus a rotation:
+see [Adopt Key Vault for a CA](#adopt-key-vault-for-a-ca) and
+[Adopt AWS KMS for a CA](#adopt-aws-kms-for-a-ca) below. `vault` remains a
+build step: bind your SDK against the `VaultSshEngine` interface and that
+backend becomes writable and signable in that build. Signature normalization,
+the per-backend algorithm table and the fail-closed contract are already
+implemented on this side of the seam; the call to Vault is the missing piece.
 
 Read the CA configurations over the API (`ca:manage`):
 
@@ -151,14 +150,13 @@ node's `TrustedUserCAKeys` file or a client's `@cert-authority` line, alongside
 public verification material: nothing that signs is exposed, and no read of any
 CA ever returns private material.
 
-> **Note:** the export projects the CA's stored public key, present for
-> `local` and `azure_keyvault` CAs alike — adopting Key Vault persists the
-> fetched public key at rotation time, the same column a `local` CA's key
-> populates. If a database carries a `aws_kms`- or `vault`-backend row from
-> before this build's gate existed, no key was ever provisioned for it, so
-> this returns `404` for that kind, and that CA cannot sign either. Rotate it,
-> naming `local` or `azure_keyvault` explicitly, to bring the kind back onto a
-> key that works.
+> **Note:** the export projects the CA's stored public key, present for every
+> backend that signs. Adopting a key service persists the public half it fetched
+> at rotation time, the same column a `local` CA's key populates. If a database
+> carries a `vault`-backend row from before this build's gate existed, no key was
+> ever provisioned for it, so this returns `404` for that kind, and that CA
+> cannot sign either. Rotate it, naming a backend that signs, to bring the kind
+> back onto a key that works.
 
 The internal mTLS CA is not served here. It is an X.509 trust anchor rather
 than an SSH CA, and it has its own export at `/v1/cas/mtls/trust-anchor` (see
@@ -223,13 +221,15 @@ adoption is necessarily a rotation onto a new key, with the same
 overlap-then-drain trust distribution any rotation needs (below). The Control
 Plane fetches the key's public half from the vault once, at this call,
 confirms it is an EC P-256 key with the `sign` operation permitted, and
-persists it. That read is bounded by `sessionlayer.ca.azure.timeout` (default
-`PT10S`): a vault that is merely slow rather than unreachable makes the
-rotate call fail with a named refusal once the bound elapses, instead of
-hanging. Every certificate afterward is signed by calling the vault and
-verified against that pinned public key before it is returned; a signature
-that does not verify, or that the vault returns in the wrong shape, fails
-closed rather than reaching a node.
+persists it. That read is bounded twice: `sessionlayer.ca.azure.timeout`
+(default `PT10S`) is the HTTP client's own connect and response timeout, and
+`sessionlayer.ca.provision-timeout` (default `PT10S`) is an independent
+wall-clock bound on the whole provisioning step. A vault that is merely slow
+rather than unreachable makes the rotate call fail with a named refusal once
+the bound elapses, instead of hanging. Every certificate afterward is signed
+by calling the vault and verified against that pinned public key before it is
+returned; a signature that does not verify, or that the vault returns in the
+wrong shape, fails closed rather than reaching a node.
 
 This path is proven end-to-end: a session CA rotated onto Key Vault this way,
 over the REST API with no database credential, then brokered a real SSH
@@ -257,6 +257,187 @@ credentials.
 > Vault CA re-adopts the exact version it already points to, which changes
 > nothing.
 
+## Adopt AWS KMS for a CA
+
+Moving a `user`, `session`, or `host` CA onto AWS KMS is a configuration change
+on the Control Plane plus a rotation onto a key that already exists in KMS. The
+internal mTLS CA cannot be adopted this way: it is absent from `/v1/cas`, and
+its key stays on `local` for the deployment's lifetime.
+
+Throughout this section, replace `eu-west-1` with your region, `111122223333`
+with your AWS account id, and `cp.example.com` with your Control Plane.
+
+Create an asymmetric signing key on P-256. That is the only key spec this
+backend accepts, whatever the CA's current algorithm:
+
+```bash
+aws kms create-key \
+  --key-spec ECC_NIST_P256 \
+  --key-usage SIGN_VERIFY \
+  --description 'SessionLayer session CA' \
+  --query KeyMetadata.Arn --output text
+```
+
+```text
+arn:aws:kms:eu-west-1:111122223333:key/1a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d
+```
+
+That ARN is the `keyReference` you adopt. It has to be a key ARN, never an
+alias ARN and never a bare key id:
+
+- `kms:UpdateAlias` repoints an alias at a different key with nothing changing
+  on the SessionLayer side, which would swap the CA's signing key while every
+  node still trusts the old public half. A reference beginning `alias/`, or an
+  ARN whose resource is `alias/...`, is refused with a `422`.
+- A bare key id names no partition, region or account, so it cannot be checked
+  against the ones this Control Plane is configured for, and it would resolve
+  against whatever the process happens to be pointed at.
+
+AWS KMS asymmetric keys never rotate their material: automatic and on-demand
+key rotation are symmetric-only. The key ARN is therefore itself the pinned
+version. There is nothing here corresponding to a Key Vault key version, and
+nothing that can float the signing key underneath a running CA.
+
+Grant the Control Plane's role exactly two actions on that one key:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SessionLayerCaSigning",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Sign",
+        "kms:GetPublicKey"
+      ],
+      "Resource": "arn:aws:kms:eu-west-1:111122223333:key/1a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d"
+    }
+  ]
+}
+```
+
+`kms:GetPublicKey` is called once, at adoption; every later read of the CA's
+public key comes from the persisted column. `kms:Sign` is one call per
+certificate. Credentials come from the standard AWS provider chain (IRSA, an
+instance profile, environment, a shared profile), so there is no credential
+property in SessionLayer's configuration and no secret in it to leak.
+
+`kms:DescribeKey` is deliberately not required. Everything it would report
+about the key, its spec, its usage and the signing algorithms it permits, is
+already in the `GetPublicKey` response and is checked there. A key that is
+disabled, scheduled for deletion, or no longer covered by a `kms:Sign` grant
+fails closed the moment it is used. Widening the required IAM surface to learn
+earlier what already fails safe is the wrong trade.
+
+Name the account and region this Control Plane signs in:
+
+```properties
+sessionlayer.ca.aws.enabled=true
+sessionlayer.ca.aws.region=eu-west-1
+sessionlayer.ca.aws.account-id=111122223333
+```
+
+Those three, with `partition` (default `aws`), are an allow-list anchor rather
+than connection details: a `keyReference` naming any other account, region or
+partition is refused, so a `config.ca_config` row written by a compromised
+database cannot redirect signing to an account an attacker controls. The
+Control Plane fails to start if any of them is missing or malformed while
+`enabled=true`. See
+[Control Plane configuration](../reference/config-control-plane.md) for the
+full property set.
+
+Rotate the CA onto the key (`ca:rotate`). This is a platform-RBAC call like
+every other step here; no database credential is involved at any point:
+
+```bash
+# CA_ID from GET /v1/cas.
+curl -s -X POST https://cp.example.com/v1/cas/$CA_ID/rotate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: adopt-session-ca-kms-2026q3" \
+  -d '{
+        "backend": "aws_kms",
+        "keyReference": "arn:aws:kms:eu-west-1:111122223333:key/1a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d",
+        "algorithm": "ecdsa-p256"
+      }'
+```
+
+Send `algorithm` explicitly whenever the CA you are adopting is not already
+`ecdsa-p256`. An omitted `algorithm` inherits the active CA's current one, and
+`ecdsa-p384`/`ecdsa-p521` are refused for this backend before anything is
+written.
+
+Confirm the kind is now active on the key you named:
+
+```bash
+curl -s https://cp.example.com/v1/cas \
+  -H "Authorization: Bearer $TOKEN" \
+  | jq '.items[] | select(.caKind == "session" and .rotationState == "active")
+        | {backend, keyReference}'
+```
+
+```json
+{
+  "backend": "aws_kms",
+  "keyReference": "arn:aws:kms:eu-west-1:111122223333:key/1a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d"
+}
+```
+
+The Control Plane fetched the key's public half from KMS once, at that call,
+confirmed it is an `ECC_NIST_P256` `SIGN_VERIFY` key offering `ECDSA_SHA_256`,
+and persisted it. That step is bounded by `sessionlayer.ca.aws.timeout`
+(default `PT10S`) on the KMS client and by `sessionlayer.ca.provision-timeout`
+(default `PT10S`) across the whole provisioning step, so KMS being slow rather
+than unreachable still ends in a refusal rather than a hang. Every certificate
+afterward is signed by calling KMS and verified locally against that pinned
+public key before it leaves the Control Plane: a signature KMS attributes to a
+different key, returns under a different algorithm, or returns in the wrong
+encoding fails closed at the point of signing, rather than becoming a
+certificate no node accepts.
+
+Now redistribute trust. Adoption is a rotation onto a new key, so the fleet has
+to learn the CA's new public half before the outgoing one drains. Export it:
+
+```bash
+curl -s https://cp.example.com/v1/cas/session/public-key \
+  -H "Authorization: Bearer $TOKEN" | jq -r .opensshPublicKey
+```
+
+```text
+ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBExampleOnlyNotARealKey= sessionlayer-session-ca
+```
+
+Put that line in every node's `TrustedUserCAKeys` file, alongside the outgoing
+key rather than replacing it, and only then drain. Both keys verify during the
+overlap, so no session is refused while distribution is in flight. The
+mechanics are the same for every backend and are covered under
+[Rotation](#rotation-overlap-then-drain) below.
+
+> **Warning:** the platform cannot see whether your trust distribution
+> finished, and the certificates it signs after the rotation are already the
+> new key's. A `session` CA promoted to `active` on a KMS key that no node yet
+> trusts breaks every new session on the fleet at once, with nothing failing on
+> the Control Plane side to tell you. Distribute first, drain last.
+
+A failed adoption never touches the active CA. The incoming key is provisioned
+in full before the transaction that promotes it, so every case below leaves the
+CA exactly as it was and can be retried once the cause is fixed:
+
+| What is wrong | What you get back |
+|---|---|
+| `keyReference` is an alias, a bare key id, or names another account, region or partition | `422` naming the rule it broke |
+| `sessionlayer.ca.aws.enabled` is not set on this Control Plane | `422` naming that property |
+| `algorithm` is `ecdsa-p384` or `ecdsa-p521` | `422`: `aws_kms` produces `ecdsa-p256` only |
+| The key is not `ECC_NIST_P256`/`SIGN_VERIFY`, or does not offer `ECDSA_SHA_256` | the rotation fails; the log names the key ARN and what the key actually is |
+| The role lacks `kms:GetPublicKey`, or the key is disabled or pending deletion | the rotation fails on the KMS refusal |
+| KMS does not answer within `sessionlayer.ca.provision-timeout` | the rotation is refused rather than left waiting on KMS |
+
+The first three are validation, refused before a single KMS call, and the
+reason comes back in the response body. The last three happen at the KMS call
+itself; the response is a server error and the reason is in the Control Plane's
+log, so read it there before retrying.
+
 ## Rotation: overlap, then drain
 
 Rotation never stops the fleet, because trust is a *set*: during rotation
@@ -272,17 +453,19 @@ curl -s https://cp.example.com/v1/cas/$CA_ID/rotate \
 ```
 
 > **Warning:** an empty body (`{}`) regenerates the *same* backend, key
-> reference, and algorithm the active CA already has — a `local` CA comes back
-> a fresh `local` key at the same curve, and an `azure_keyvault` CA re-adopts
-> the exact key version it already points to, changing nothing operationally.
-> `backend`, `keyReference`, and `algorithm` are real, validated overrides for
-> the incoming key: naming a backend this build has no signer for, or a Key
-> Vault reference that is unversioned or names a different vault, is a `422`
-> before anything is written. This also means rotating a CA carried from an
-> older deployment on `aws_kms` or `vault` does **not** self-heal on an empty
-> body: an omitted `backend` inherits that same non-signing backend and the
-> rotation is refused. Name the backend explicitly — `{"backend": "local"}`,
-> or adopt Key Vault (above) — to bring the kind back onto a key that signs.
+> reference, and algorithm the active CA already has. A `local` CA comes back a
+> fresh `local` key at the same curve; an `azure_keyvault` CA re-adopts the
+> exact key version it already points to, and an `aws_kms` CA the exact key ARN,
+> both changing nothing operationally. `backend`, `keyReference`, and
+> `algorithm` are real, validated overrides for the incoming key: naming a
+> backend this build has no signer for, a Key Vault reference that is
+> unversioned or names a different vault, or a KMS reference that is an alias or
+> names a different account, is a `422` before anything is written. This also
+> means rotating a CA carried from an older deployment on `vault` does not
+> self-heal on an empty body: an omitted `backend` inherits that same
+> non-signing backend and the rotation is refused. Name the backend explicitly,
+> `{"backend": "local"}` or one of the adoptions above, to bring the kind back
+> onto a key that signs.
 
 The state machine (`ca:rotate` permission): a new key is provisioned as
 `incoming`, the current `active` moves to `outgoing` (both trusted), and the
@@ -317,7 +500,7 @@ signing, and the shipped alerts page on signer fail-closed spikes. See
 ## Next
 
 - [Production hardening](../security/hardening.md): the KEK that protects
-  whatever stays on `local`, and adopting Key Vault for the rest.
+  whatever stays on `local`, and adopting a key service for the rest.
 - [Nodes](nodes.md): the `TrustedUserCAKeys` line and host anchors this
   page's trust model relies on.
 - [Locks](locks.md): the immediate revocation tool, so rotation never has
