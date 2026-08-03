@@ -275,7 +275,7 @@ injects credentials from the environment.
 | `sessionlayer.ca.local.kek-base64` | string (base64) | none | The key-encryption key wrapping local-backend CA private keys. Production must set it (32 bytes, base64). |
 | `sessionlayer.ca.local.kek-reference` | string | none | An operator-visible label for the KEK in use. |
 | `sessionlayer.ca.local.allow-dev-kek` | boolean | `false` | Allows starting with the built-in dev KEK. Refused otherwise (fail closed). |
-| `sessionlayer.ca.provision-timeout` | duration | `PT10S` | Wall-clock bound on provisioning one incoming CA key during a rotation, whatever the backend. A key service that is slow rather than down makes the rotate call fail with a named refusal once this elapses, rather than hang. Independent of each backend's own HTTP timeouts, which cannot bound a response that trickles. |
+| `sessionlayer.ca.provision-timeout` | duration | `PT10S` | Wall-clock bound on provisioning one incoming CA key during a rotation, whatever the backend. A key service that is slow rather than down makes the rotate call fail with a named refusal once this elapses, rather than hang. Independent of each backend's own HTTP timeouts, which cannot bound a response that trickles. Took over this role from `sessionlayer.ca.azure.timeout`; see [Upgrades](../operations/upgrades.md#renamed-configuration-properties). |
 | `sessionlayer.coldstart.enabled` | boolean | `true` | Provisions operator settings and the three SSH CAs at startup, exactly once, idempotently. |
 | `sessionlayer.coldstart.timeout-seconds` | long | `60` | Bound on cold-start provisioning; a stuck provisioner crashes the boot rather than hanging it. |
 
@@ -309,8 +309,9 @@ the adoption procedure and the minimum IAM policy.
 | `sessionlayer.ca.aws.region` | string | none | The region this Control Plane signs in. Required when `enabled=true`; matched against `[a-z0-9-]+`, or startup fails naming the property. |
 | `sessionlayer.ca.aws.account-id` | string | none | The AWS account the signing key lives in. Required when `enabled=true`; exactly 12 digits. |
 | `sessionlayer.ca.aws.partition` | enum | `aws` | `aws`, `aws-us-gov`, or `aws-cn`. |
-| `sessionlayer.ca.aws.endpoint-override` | string (URL) | none | Sends KMS calls to this endpoint instead of the region's. Must be an absolute `https://` URL with a host; `http://` is accepted only when `allow-insecure-endpoint=true`, and any other scheme never is. |
-| `sessionlayer.ca.aws.allow-insecure-endpoint` | boolean | `false` | Permits an `http` `endpoint-override`. Development and tests only. |
+| `sessionlayer.ca.aws.endpoint-override` | string (URL) | none | Sends every KMS call to this endpoint instead of the region's. Requires `allow-endpoint-override=true` whatever the scheme. Must be an absolute URL with a host, and `https` unless `allow-insecure-endpoint=true` is set as well; no other scheme is ever accepted. |
+| `sessionlayer.ca.aws.allow-endpoint-override` | boolean | `false` | Required for any `endpoint-override` at all. Development and tests only. |
+| `sessionlayer.ca.aws.allow-insecure-endpoint` | boolean | `false` | Required in addition to `allow-endpoint-override` for a plaintext (`http`) endpoint. Development and tests only. |
 | `sessionlayer.ca.aws.timeout` | duration | `PT10S` | Applied to the KMS client four ways: connection timeout, socket timeout, API-call timeout, and per-attempt timeout. The provisioning step of a rotation is bounded separately by `sessionlayer.ca.provision-timeout`. |
 
 `region`, `account-id` and `partition` are an allow-list anchor, not connection details: a
@@ -319,11 +320,18 @@ row written by a compromised database cannot redirect signing to an account an a
 There is no credential property. Credentials come from the standard AWS provider chain, so no
 secret, token or key material belongs in this configuration.
 
-> **Warning:** `sessionlayer.ca.aws.allow-insecure-endpoint=true` lets every KMS call, including
-> the CA's signing requests, run over plaintext HTTP. It exists so a test deployment can point at a
-> local KMS emulator. Leaving it at `false` is what turns a mistyped `endpoint-override` scheme
-> into a startup failure rather than an unencrypted signing path. Never set it in production; leave
-> `endpoint-override` unset there and let the SDK resolve the region's own endpoint.
+> **Warning:** an endpoint override is a trust decision, not a routing one, which is why setting
+> one at all takes an explicit opt-in and the scheme is the smaller question. Whoever answers that
+> endpoint supplies the public key the CA is pinned to at adoption, so the signature verification
+> that pinning buys you cannot bound a redirect it was bootstrapped through. They also receive the
+> credentials SigV4 signs each request with, which under IRSA or an instance profile is a live
+> session token. An `https://` host you do not control is the dangerous case, not merely a
+> plaintext one. Leave both flags off and `endpoint-override` unset in production, and let the
+> region resolve the endpoint.
+
+A Control Plane that starts with an override in effect logs a WARN naming the endpoint, so one
+that outlives the test deployment it was added for is visible in the log rather than only in the
+configuration.
 
 ## Next
 

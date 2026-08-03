@@ -68,6 +68,31 @@ release, after the fleet has settled. Consequences for you:
 - Take your normal Postgres backup before upgrading anyway; migrations are
   forward-only.
 
+## Renamed configuration properties
+
+Nothing falls back to an old property name. The Control Plane reads the new
+name, finds nothing, and takes its default, so a value you raised on purpose
+reverts without an error anywhere. Check this list before you roll the Control
+Plane.
+
+The rotation provisioning bound is no longer Azure's timeout. It is
+`sessionlayer.ca.provision-timeout` (default `PT10S`), and it bounds
+provisioning one incoming CA key during a rotation, on every backend.
+`sessionlayer.ca.azure.timeout` still exists and still sets the Key Vault HTTP
+client's connect and response timeout, but it no longer has anything to do with
+rotation.
+
+If you raised `sessionlayer.ca.azure.timeout` because your vault is slow, that
+raise used to cover both. After the upgrade only the HTTP half keeps it and
+rotation drops to `PT10S`, so a rotation that took longer than ten seconds
+starts failing with a provisioning timeout on a deployment whose own
+configuration did not change. Carry the value across:
+
+```properties
+sessionlayer.ca.azure.timeout=PT30S
+sessionlayer.ca.provision-timeout=PT30S
+```
+
 ## Rollback
 
 - Control Plane and Gateway: deploy the previous release. The N-1 window
