@@ -319,11 +319,11 @@ row written by a compromised database cannot redirect signing to an account an a
 There is no credential property. Credentials come from the standard AWS provider chain, so no
 secret, token or key material belongs in this configuration.
 
-> **Warning:** `sessionlayer.ca.aws.allow-insecure-endpoint=true` sends every KMS call, including
-> the CA's signing requests, over plaintext HTTP. It exists so a test deployment can point at a
-> local KMS emulator, and it is the only thing standing between a mistyped `endpoint-override`
-> scheme and an unencrypted signing path. Never set it in production; leave `endpoint-override`
-> unset there and let the SDK resolve the region's own endpoint.
+> **Warning:** `sessionlayer.ca.aws.allow-insecure-endpoint=true` lets every KMS call, including
+> the CA's signing requests, run over plaintext HTTP. It exists so a test deployment can point at a
+> local KMS emulator. Leaving it at `false` is what turns a mistyped `endpoint-override` scheme
+> into a startup failure rather than an unencrypted signing path. Never set it in production; leave
+> `endpoint-override` unset there and let the SDK resolve the region's own endpoint.
 
 ## Next
 
