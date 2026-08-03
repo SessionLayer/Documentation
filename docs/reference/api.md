@@ -456,20 +456,22 @@ algorithm the chosen backend cannot produce, is a `422` at validation).
 `rotationState` (`incoming`/`active`/`outgoing`/`expired`) is managed by the rotation state machine
 and read-only here.
 
-The `backend` set is wider than what can sign. `local` and `azure_keyvault` resolve to a signer;
-`aws_kms` and `vault` are each refused at validation with a `422` saying the backend has no signer
-in this build. The write path and the signer path ask the same question, so a backend the API
-accepts is one that can issue. A row stored before that gate existed still cannot sign, and fails at
-the first signature instead. `azure_keyvault` additionally requires a fully versioned Key Vault
-`keyReference`, checked at the same validation step; see
-[Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca) for
-the adoption procedure and [Production hardening](../security/hardening.md) for the KEK that
-protects whatever remains on `local`.
+The `backend` set is wider than what can sign. `local`, `aws_kms` and `azure_keyvault` resolve to a
+signer; `vault` is refused at validation with a `422` saying the backend has no signer in this
+build. The write path and the signer path ask the same question, so a backend the API accepts is one
+that can issue. A stored row naming a backend that cannot sign still reads back, and fails at the
+first signature instead. Each key-service backend additionally constrains its `keyReference`, checked at
+the same validation step: `azure_keyvault` requires a fully versioned Key Vault identifier, and
+`aws_kms` a key ARN in the configured account, region and partition (never an alias, never a bare
+key id). Either is a `422` on a Control Plane that has not configured that backend. See
+[Certificate authorities](../admin-guides/certificate-authorities.md) for the two adoption
+procedures and [Production hardening](../security/hardening.md) for the KEK that protects whatever
+remains on `local`.
 
 The `CaAlgorithm` enum in the contract is wider than what any backend can produce: it also carries
 `ed25519`, `rsa-2048` and `rsa-4096`, matching the `ca_config.algorithm` CHECK exactly so a row an
-upgraded deployment already holds can still be read back, and `azure_keyvault` produces only
-`ecdsa-p256` of the three ECDSA curves. This API refuses to create a CA on, or update one onto, any
+upgraded deployment already holds can still be read back, and every backend other than `local`
+produces only `ecdsa-p256` of the three ECDSA curves. This API refuses to create a CA on, or update one onto, any
 of the three non-ECDSA algorithms, and none of them can be assembled into a signer. See
 [Data model](data-model.md#enums) for why the two layers differ.
 

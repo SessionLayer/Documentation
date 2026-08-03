@@ -110,10 +110,10 @@ sessionlayer.ca.local.kek-base64=<your-kek>
 > Every CA starts on `local` at cold start, so set a real KEK regardless of
 > what you do afterward. The internal mTLS CA cannot move off `local` at all,
 > so this KEK always protects it; the three SSH CAs (`user`/`session`/`host`)
-> can later be adopted onto Azure Key Vault, at which point their keys leave
-> the database entirely. Take the KEK from your secrets manager and keep it
-> out of the database's backup path. See
-> [Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca).
+> can later be adopted onto Azure Key Vault or AWS KMS, at which point their
+> keys leave the database entirely. Take the KEK from your secrets manager and
+> keep it out of the database's backup path. See
+> [Certificate authorities](../admin-guides/certificate-authorities.md).
 
 ## Run it
 
@@ -153,6 +153,21 @@ built-in `9090`. Drop it and the published `9443` reaches nothing.
 
 ### Kubernetes
 
+No container image is published for any SessionLayer component, so the
+`image: ghcr.io/sessionlayer/controlplane:latest` line in
+`deploy/kubernetes/control-plane.yaml` is a placeholder, not a pullable
+reference. Push your own first, replacing `registry.example.com` with a
+registry your cluster can pull from and `<tag>` with however you version
+images:
+
+```bash
+docker build -f deploy/Dockerfile -t registry.example.com/sessionlayer/controlplane:<tag> .
+docker push registry.example.com/sessionlayer/controlplane:<tag>
+```
+
+Point the manifest's `image:` at what you pushed, by digest rather than tag
+for production, then apply:
+
 ```bash
 kubectl create namespace sessionlayer
 kubectl apply -n sessionlayer -f deploy/kubernetes/networkpolicy.yaml
@@ -160,6 +175,11 @@ kubectl apply -n sessionlayer -f deploy/kubernetes/networkpolicy.yaml
 kubectl apply -n sessionlayer -f deploy/kubernetes/secret.example.yaml
 kubectl apply -n sessionlayer -f deploy/kubernetes/control-plane.yaml
 ```
+
+> **Warning:** applying the manifest with the placeholder `image:` unchanged
+> leaves the pods in `ImagePullBackOff`, since that repository does not exist.
+> The readiness probe never passes and nothing in the platform reports a
+> configuration fault, because none of it started.
 
 `deploy/kubernetes/control-plane.yaml` ships a Deployment (2 replicas), a
 Service named `controlplane`, a ConfigMap, and a PodDisruptionBudget. Its

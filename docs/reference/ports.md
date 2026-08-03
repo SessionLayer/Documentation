@@ -46,6 +46,7 @@ implied or optional-but-undocumented.
 | Control Plane | Object store | `9000`/`443` | Presigns upload/replay/export URLs; retention | `sessionlayer.recording.worm.endpoint` |
 | Control Plane | Your IdP | `443` | OIDC issuer metadata, JWKS, token endpoint | `sessionlayer.oidc.issuer` |
 | Control Plane | Azure Key Vault | `443` | Signs with a CA adopted onto `azure_keyvault`: one public-key read at adoption, then one call per signature. Absent unless configured | `sessionlayer.ca.azure.vault-uri` |
+| Control Plane | AWS KMS | `443` | Signs with a CA adopted onto `aws_kms`: one `GetPublicKey` at adoption, then one `Sign` per signature. Absent unless configured | `sessionlayer.ca.aws.region`, `sessionlayer.ca.aws.endpoint-override` |
 | Browser | Control Plane | `443` (via proxy) | The REST API, OIDC login, device-flow verification page | your proxy in front of `8080` |
 | Browser | Object store | `443` | Recording replay/export via the signed URL (decrypted client-side with the customer recording key) | signed URL |
 | All components | OTel collector | `4317` | Trace export (only when configured) | `OTEL_EXPORTER_OTLP_ENDPOINT` |
@@ -61,10 +62,10 @@ implied or optional-but-undocumented.
 - The Gateway accepts SSH from users and the agent transport from Agents/peer Gateways; it dials
   the Control Plane, nodes, the object store, and (in HA with NATS) the signal bus.
 - The Control Plane accepts REST (`8080`) and gRPC (`9090` default) only; it dials Postgres, the
-  object store, and your IdP, plus Azure Key Vault if you have adopted it for a CA
-  ([Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca)).
-  AWS KMS and HashiCorp Vault remain unimplemented seams the Control Plane never dials. Restrict
-  its egress to exactly those (see [Production hardening](../security/hardening.md)).
+  object store, and your IdP, plus Azure Key Vault or AWS KMS if you have adopted either for a CA
+  ([Certificate authorities](../admin-guides/certificate-authorities.md)). HashiCorp Vault remains
+  an unimplemented seam the Control Plane never dials. Restrict its egress to exactly those (see
+  [Production hardening](../security/hardening.md)).
 - Sessions through the platform always transit a Gateway. Users hold no platform credential that
   reaches a node directly. Whether operators keep a direct native-SSH path open besides is the
   recovery trade-off above.

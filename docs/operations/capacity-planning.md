@@ -130,7 +130,7 @@ Control Plane replica.
 |---|---|
 | `sessionlayer_session_establishment_seconds` p95 above 250 ms with CPU saturated | Yes. The SLO (NFR-4) is set as a histogram boundary at 250 ms in `application.properties`. |
 | R2DBC pool utilization pinned with pending acquires | Yes, if Postgres has connection headroom (see the pool math below). Otherwise raise `spring.r2dbc.pool.max-size` first. |
-| `sessionlayer.cert.sign` p95 above its 100 ms boundary | Yes if CPU-bound with the local backend. If the backend is Azure Key Vault, AWS KMS, or Vault, the ceiling is that service's latency, not the replica count. |
+| `sessionlayer.cert.sign` p95 above its 100 ms boundary | Yes if CPU-bound with the local backend. If the backend is Azure Key Vault or AWS KMS, the ceiling is that service's latency, not the replica count. |
 | Audit writes lagging | No. Every audit insert serializes on one cluster-wide Postgres advisory lock to keep the hash chain linear, so replicas add no audit-write throughput. |
 | Session-limit denials spiking (`sessionlayer.session.limit`) | No. That is policy working; check the cap, not the capacity. |
 

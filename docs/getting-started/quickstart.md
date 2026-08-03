@@ -77,8 +77,8 @@ Everything else you are about to do uses the product's REST API.
 > to the in-network plain-HTTP MinIO with `require_https: false` in its
 > rendered config. Everything binds to `127.0.0.1`. All three are wrong for
 > production: CA keys live in the database under a real key-encryption key, or
-> on Azure Key Vault for the three SSH CAs (see
-> [Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca)),
+> in Azure Key Vault or AWS KMS for the three SSH CAs (see
+> [Certificate authorities](../admin-guides/certificate-authorities.md)),
 > credentials are real, and the recorder keeps its HTTPS default. See
 > [Production hardening](../security/hardening.md).
 

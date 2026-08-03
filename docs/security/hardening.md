@@ -135,25 +135,32 @@ guaranteed ceiling:
 worst-case first boot (CA cold start, bootstrap, and audit partitions)
 blocks that long by design rather than hang half-ready.
 
-## 3. CA backends: `local`, and `azure_keyvault` for the three SSH CAs
+## 3. CA backends: `local`, and a key service for the three SSH CAs
 
-`local` and `azure_keyvault` both sign on the shipped build. `aws_kms` and
-`vault` remain integration seams: nothing in this build implements the
-interface either one consumes, so a CA naming one of them takes the write and
-then fails every signature.
+Three of the four backends sign on the shipped build, and each key service stays
+off until you configure it.
 
-> **Warning:** `aws_kms` and `vault` still refuse `POST /v1/cas` and
-> `PUT /v1/cas/{caId}` with a `422` saying the backend has no signer in this
-> build. There is no configuration that turns either on, and a row that already
-> carries one cannot issue: the failure surfaces at the first session or host
-> certificate, which stops the platform brokering sessions.
+| Backend | Signs | Configured by |
+|---|---|---|
+| `local` | yes | nothing to set; every CA starts here at cold start |
+| `azure_keyvault` | yes | `sessionlayer.ca.azure.*` |
+| `aws_kms` | yes | `sessionlayer.ca.aws.*` |
+| `vault` | no | not implemented in this build |
 
-The internal mTLS CA is different: it cannot move to Key Vault at all. It is
-deliberately absent from `/v1/cas` and has no rotate operation, so it stays on
-`local` for the life of a deployment, and the KEK below protects it regardless
-of what you do with the three SSH CAs. See
-[Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca)
-for the SSH-CA adoption procedure, and
+> **Warning:** `vault` still refuses `POST /v1/cas` and `PUT /v1/cas/{caId}`
+> with a `422` saying the backend has no signer in this build. There is no
+> configuration that turns it on, and a row that already carries it cannot
+> issue: the failure surfaces at the first session or host certificate, which
+> stops the platform brokering sessions. A Control Plane that has not
+> configured `sessionlayer.ca.azure.*` or `sessionlayer.ca.aws.*` refuses that
+> backend the same way, naming the property to set.
+
+The internal mTLS CA is different: it cannot move to a key service at all. It
+is deliberately absent from `/v1/cas` and has no rotate operation, so it stays
+on `local` for the life of a deployment, and the KEK below protects it
+regardless of what you do with the three SSH CAs. See
+[Certificate authorities](../admin-guides/certificate-authorities.md)
+for the two adoption procedures, and
 [Data model](../reference/data-model.md#enums) for why the stored backend set
 is wider than the usable one.
 
@@ -181,11 +188,11 @@ process-level secrets, keep it out of the database and out of the same backup
 stream as the database, and rotate it with the CA rotation procedure rather than
 in place.
 
-Adopting Key Vault for a SSH CA narrows the KEK's blast radius; it does not
+Adopting a key service for a SSH CA narrows the KEK's blast radius; it does not
 remove the need for it. The internal mTLS CA's key never leaves the database,
 so a database-plus-KEK compromise still forges signed authorization decisions
 and impersonates the Control Plane to every Gateway and Agent, even on a
-deployment that has moved every SSH CA to Key Vault. The compensating controls
+deployment that has moved every SSH CA off `local`. The compensating controls
 for whatever remains on `local` are the ones in step 2: the restricted
 `cp_runtime` role, constrained superuser access, and the host hardening in
 step 7. The session CA is the one that mints what nodes trust, so treat a

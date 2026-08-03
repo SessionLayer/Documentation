@@ -32,8 +32,8 @@ container security context then carries that layer.
 | S3-compatible object store with Object Lock | MinIO or AWS S3 | WORM recording storage |
 | OIDC identity provider | any spec-compliant IdP | user login (auth-code + PKCE, device flow) |
 | Azure Key Vault (optional) | n/a | a production CA backend for the three SSH CAs; shipped and signer-complete |
+| AWS KMS (optional) | n/a | a production CA backend for the three SSH CAs; shipped and signer-complete |
 | HashiCorp Vault (optional) | 1.18+ with the SSH secrets engine | a production CA backend (`/ssh/sign`); an integration seam in this build, no shipped signer |
-| AWS KMS (optional) | n/a | a production CA backend; an integration seam in this build, no shipped signer |
 | NATS (HA mode only) | 2.10 | coordination signaling, never session bytes |
 
 Single-instance mode needs Postgres only; everything else on this list is
@@ -41,14 +41,14 @@ either optional or tied to a capability you enable. Versions are what the
 platform is developed and continuously tested against.
 
 > **Warning:** `local`, protected by a real key-encryption key, is a
-> legitimate production CA backend for every CA kind — see
-> [Production hardening](../security/hardening.md). Azure Key Vault is the one
-> alternative that actually signs in this build, for the three SSH CAs
-> (`user`/`session`/`host`); AWS KMS and HashiCorp Vault remain integration
-> seams a deployment would have to bind its own SDK against. The internal
-> mTLS CA cannot move off `local` regardless. See
-> [Certificate authorities](../admin-guides/certificate-authorities.md#adopt-key-vault-for-a-ca)
-> for adopting Key Vault.
+> legitimate production CA backend for every CA kind. See
+> [Production hardening](../security/hardening.md). Azure Key Vault and AWS KMS
+> are the alternatives that actually sign in this build, for the three SSH CAs
+> (`user`/`session`/`host`); HashiCorp Vault remains an integration seam a
+> deployment would have to bind its own SDK against. The internal mTLS CA
+> cannot move off `local` regardless. See
+> [Certificate authorities](../admin-guides/certificate-authorities.md)
+> for both adoption procedures.
 
 ## Nodes
 

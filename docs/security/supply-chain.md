@@ -15,6 +15,13 @@ What each release artifact carries:
 | CycloneDX SBOM | the full dependency inventory (itself signed and attested) | CycloneDX JSON |
 | Reproducible double-build | the release pipeline builds twice in clean trees and fails on any digest drift | release-gate check |
 
+A release is the jar or binary and its evidence. No container image is
+published, so there is no image signature or image provenance to check: an
+image you run is one you built, and the chain of custody you can verify ends
+at the artifact you built it from. The `image:` reference in every shipped
+Kubernetes manifest is a placeholder for your own registry
+([Install the Control Plane](../installation/control-plane.md)).
+
 Signing is keyless: the CI's ephemeral GitHub OIDC identity gets a
 short-lived certificate from Fulcio, and the signing event is logged to
 Rekor. There is no long-lived signing key to steal, so the thing you verify

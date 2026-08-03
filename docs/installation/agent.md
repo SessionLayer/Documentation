@@ -113,6 +113,13 @@ Linux ≥ 6.7), the Agent degrades with a loud, logged Accepted-Risk instead of
 refusing to start; `--require-full-landlock` turns that degrade into a
 startup failure for regimes that cannot accept it.
 
+No container image is published for any SessionLayer component, so build one
+from the `Dockerfile` at the repository root:
+
+```bash
+docker build -t sessionlayer-agent .
+```
+
 The reference container runs as uid 65532 with a read-only rootfs and the
 data directory as its only writable volume:
 
@@ -121,13 +128,16 @@ docker run --read-only \
   --user 65532:65532 \
   --security-opt no-new-privileges \
   -v sl-agent-data:/var/lib/sessionlayer-agent \
-  ghcr.io/sessionlayer/agent:latest run ...
+  sessionlayer-agent run ...
 ```
 
 For Kubernetes, `deploy/kubernetes/agent-daemonset.yaml` is a reference
 DaemonSet with the same posture, and `deploy/kubernetes/agent-networkpolicy.yaml`
 denies all inbound traffic and scopes egress to the Control Plane, the
-configured Gateways, and DNS.
+configured Gateways, and DNS. Its `image:` line names
+`ghcr.io/sessionlayer/agent:latest`, which is a placeholder like the others:
+push the image you built to a registry your nodes can pull from and point the
+DaemonSet at it, or the pods stay in `ImagePullBackOff`.
 
 ## Exit codes your supervisor should know
 
