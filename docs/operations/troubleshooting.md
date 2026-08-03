@@ -108,7 +108,7 @@ Also check the boring one first: `GET /v1/nodes`. Is the node `active` and
 ## Host-identity verification failures
 
 A session that dies at the inner leg with a host-verification abort (and a
-`host_verify` error span or log) means the node presented a key or
+`gateway.host_verify` error span or log) means the node presented a key or
 certificate that does not match its enrolled anchor. This is the no-TOFU
 guarantee working. Either the node was re-keyed without re-enrollment
 (update its anchor, see [Nodes](../admin-guides/nodes.md)), or something is

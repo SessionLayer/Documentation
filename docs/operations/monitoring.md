@@ -53,8 +53,11 @@ join it, and Agent spans (`agent.dial_back`, `agent.splice`) correlate by
 [audit stream](../admin-guides/audit.md) and the recording.
 
 The shipped collector config derives RED metrics from those spans, keyed by
-`span_name` (`gateway.session`, `outer_leg.auth`, `node.connect`,
-`host_verify`, `bridge_setup`) and `status_code`. Fail-closed closes,
+`span_name` (`gateway.session`, `gateway.outer_leg.auth`,
+`gateway.node.connect`, `gateway.host_verify`, `gateway.bridge_setup`) and
+`status_code`. Those names are carried verbatim as the `span_name` label
+value, so a selector that drops the `gateway.` prefix matches nothing and the
+panel built on it stays empty. Fail-closed closes,
 including Control-Plane-down at authentication, mark their spans as errors,
 so the span-derived error rate reflects real outages; ordinary auth-scan
 rejections deliberately do not, preserving the signal.
@@ -108,8 +111,8 @@ ownership-transition lines (standby, heartbeat-failed, release) have no
 counter today, so alert on them from your log pipeline, not a metric
 ([High availability](../admin-guides/high-availability.md)). The
 span-derived RED layer above covers session establishment and
-`node.connect`; it is specifically the peer-relay and presence plane that
-stops at the log line.
+`gateway.node.connect`; it is specifically the peer-relay and presence plane
+that stops at the log line.
 
 ## The Agent
 

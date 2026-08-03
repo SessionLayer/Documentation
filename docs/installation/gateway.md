@@ -36,6 +36,12 @@ readinessProbe polls the Gateway's own `GET /readyz` surface
 (`ha.drain.readyz_addr`), so the Service stops routing to a pod that is
 unready or draining before the pod stops listening.
 
+Its `image: ghcr.io/sessionlayer/gateway:latest` line is a placeholder: no
+container image is published for any SessionLayer component. Build one with
+the command below, push it to a registry your cluster can pull from, and point
+the manifest at what you pushed, by digest for production. Applying the
+manifest unchanged leaves the pods in `ImagePullBackOff`.
+
 Build the hardened image (or the bare binary):
 
 ```bash
