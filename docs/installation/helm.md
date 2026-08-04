@@ -27,10 +27,10 @@ the tarball wherever your cluster's tooling reads charts from.
 
 ## Nothing installs with a working credential
 
-No chart creates a Secret. Every credential is referenced by the name of a
-Secret you create out of band, and a missing reference fails at render time
-with a message naming the value and the keys it expects. The failure lands in
-your terminal, not in a `CrashLoopBackOff` an hour later:
+No chart defaults a credential to a working value. Each one is referenced by
+the name of a Secret you create out of band, and a missing reference fails at
+render time with a message naming the value and the keys it expects. The
+failure lands in your terminal, not in a `CrashLoopBackOff` an hour later:
 
 ```console
 $ helm template cp deploy/helm/sessionlayer-controlplane
@@ -56,10 +56,18 @@ private keys wrapped under a public constant.
 
 Two consequences worth planning for:
 
-- A credential never passes through a values file, so it never reaches Helm's
-  release storage in the cluster either. `helm get values` on a SessionLayer
-  release returns no secret material.
-- Secret rotation is a Secret update plus a pod restart, not a `helm upgrade`.
+- Rotating a credential is a Secret update plus a pod restart, not a
+  `helm upgrade`.
+- Helm stores the values a release was installed with, inside the cluster.
+  Because the credentials are references, `helm get values` returns names
+  rather than secret material.
+
+> **Warning:** the Gateway chart is the one exception, and a deliberate one.
+> `bootstrap.enrollmentToken` can be passed as a value, which does put it in
+> Helm's release storage. The token is single-use and short-TTL, so what is
+> retained is a spent credential, but the way to avoid it entirely is
+> `config.existingSecret`: put the whole `gateway.json` in a Secret you create,
+> and the chart renders no configuration of its own.
 
 ## Pin the image by digest
 
@@ -97,15 +105,20 @@ out-of-band steps around it:
 
 ## Network policy is on by default
 
-Every chart that renders a NetworkPolicy renders it default-deny in both
-directions, enabled, with the CIDR lists for off-cluster peers left empty. An
-empty list denies the traffic, which is visible immediately; a placeholder
-range would permit egress to hosts that are not your object store or your
-identity provider, which is worse than no rule at all. Fill in the ranges your
-deployment genuinely needs.
+All four charts render a NetworkPolicy, enabled, permitting only the peers the
+component genuinely talks to. The CIDR lists for peers outside the cluster
+start empty: an empty list denies that traffic, which is visible immediately,
+where a placeholder range would permit egress to hosts that are not your object
+store, your identity provider or your fleet. Fill in the ranges your deployment
+needs and no more.
 
-This assumes a CNI that enforces NetworkPolicy. On one that does not, the
-objects are accepted by the API server and enforce nothing, which looks
+The Dashboard is the one whose ingress side is open by default, on the
+container port, to the whole cluster. An ingress controller lives in a
+namespace the chart cannot guess, so narrowing that is left to you once you
+know your controller's labels.
+
+All of this assumes a CNI that enforces NetworkPolicy. On one that does not,
+the objects are accepted by the API server and enforce nothing, which looks
 identical to a working policy from `kubectl`.
 
 ## Verify a render before you apply it
@@ -120,8 +133,11 @@ helm template cp deploy/helm/sessionlayer-controlplane \
 ```
 
 ```console
+==> Linting deploy/helm/sessionlayer-controlplane
+[INFO] Chart.yaml: icon is recommended
+
 1 chart(s) linted, 0 chart(s) failed
-Summary: 6 resources found in 1 file - Valid: 6, Invalid: 0, Errors: 0, Skipped: 0
+Summary: 6 resources found parsing stdin - Valid: 6, Invalid: 0, Errors: 0, Skipped: 0
 ```
 
 Each chart's `ci/` directory holds the values file it is linted and
