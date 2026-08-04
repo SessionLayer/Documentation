@@ -79,8 +79,9 @@ enrollment is a spent credential rather than a standing one. That bounds the
 exposure. It does not remove it, which is why the first path is the one to
 deploy with.
 
-Both are stricter than the manifest the chart translates:
-`deploy/kubernetes/gateway.yaml` carries the same file in a ConfigMap.
+The manifest the chart translates, `deploy/kubernetes/gateway.yaml`, carries the
+same file in a Secret you edit in place, so its token reaches no release
+storage at all and lands instead in whatever file you edited.
 
 ## Pin the image by digest
 

@@ -32,10 +32,11 @@ Prerequisites:
 | Filesystem | read-only rootfs + Landlock | `ProtectSystem=strict` + Landlock |
 | Egress control | the chart's `networkPolicy.*`, or `deploy/kubernetes/networkpolicy.yaml` | host firewall |
 
-`deploy/kubernetes/gateway.yaml` ships a Deployment, a ConfigMap, and a
-`LoadBalancer` Service mapping port `22` to the container's `2222`. Its
-readinessProbe polls the Gateway's own `GET /readyz` surface
-(`ha.drain.readyz_addr`), so the Service stops routing to a pod that is
+`deploy/kubernetes/gateway.yaml` ships a Secret holding `gateway.json`, a
+ConfigMap holding the Control Plane's CA certificate, a Deployment, a
+PodDisruptionBudget, and a `LoadBalancer` Service mapping port `22` to the
+container's `2222`. Its readinessProbe polls the Gateway's own `GET /readyz`
+surface (`ha.drain.readyz_addr`), so the Service stops routing to a pod that is
 unready or draining before the pod stops listening.
 
 ## Get the image
@@ -272,12 +273,12 @@ The plain manifests remain the non-Helm reference. Apply
 `deploy/kubernetes/networkpolicy.yaml` and `deploy/kubernetes/gateway.yaml`,
 replacing the manifest's `image:` tag with the digest you verified.
 
-> **Warning:** `gateway.yaml` carries `gateway.json` in a ConfigMap, with
-> `REPLACE_WITH_ENROLLMENT_TOKEN` where the token goes. Filling that in puts a
-> live credential in an object nothing treats as secret material: cluster RBAC,
-> audit policy and etcd encryption-at-rest are all configured around Secrets,
-> and a ConfigMap sits outside each of them. Move the file into a Secret before
-> you fill it in, or use the chart, which renders it into one.
+> **Warning:** `gateway.yaml` carries `gateway.json` in a Secret, with
+> `REPLACE_WITH_ENROLLMENT_TOKEN` where the token goes. Filling that in writes a
+> live credential into a file on your disk, so edit a copy outside the
+> repository and delete it once the Gateway has enrolled. The token is
+> single-use, so what a stray copy holds afterwards is spent rather than
+> standing.
 
 [Deploy with Helm](helm.md) covers what all four charts have in common, and the
 static-validation-only status they ship with.
