@@ -54,6 +54,13 @@ sessionlayer-agent --version                      # Agent version and wire-proto
 This order keeps every hop inside the N-1 window at every moment, and means
 each layer's server side is never older than its clients' maximum.
 
+Container deployments upgrade by moving `image.digest` and rolling the
+workload, which is the same order. The verifier does not run on that path:
+`sessionlayer-agent update` checks a candidate binary, and a DaemonSet image
+change replaces the whole container without one. Verifying the image digest
+before you pin it is the equivalent control, and it has to be a deliberate
+step, because nothing in a `helm upgrade` performs it for you.
+
 ## Database migrations: expand and contract
 
 Migrations run automatically at Control Plane startup (Flyway) and follow
