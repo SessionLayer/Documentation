@@ -21,7 +21,7 @@ Prerequisites:
 | | Container (Kubernetes) | Bare-metal / VM (systemd) |
 |---|---|---|
 | Assets | `deploy/helm/sessionlayer-controlplane/`, or `deploy/kubernetes/control-plane.yaml` | `deploy/systemd/sessionlayer-control-plane.service` |
-| Identity | non-root (uid 10000), read-only rootfs | `DynamicUser=yes`: no privileged port to bind, no local state to keep a stable UID for |
+| Identity | non-root (uid 65532), read-only rootfs | `DynamicUser=yes`: no privileged port to bind, no local state to keep a stable UID for |
 | Config | a ConfigMap + a Secret, both plain `SPRING_*`/`SESSIONLAYER_*` env vars | one `EnvironmentFile` |
 | Egress control | `deploy/kubernetes/networkpolicy.yaml` | host firewall |
 
@@ -37,11 +37,17 @@ docker pull ghcr.io/sessionlayer/controlplane:v0.0.2
 ```
 
 `v0.0.2` is the release tag; substitute the one you are installing. There is no
-`:latest`. The image is a `linux/amd64` + `linux/arm64` index carrying a
-jlink'd Java 25 runtime on a distroless base, so there is no shell, no package
-manager and no JDK tooling in it. `USER` is a numeric 10000, which is what lets
-Kubernetes `runAsNonRoot` enforce it without an `/etc/passwd` lookup, and `/tmp`
-is the only path the process writes.
+`:latest`. The image is a `linux/amd64` + `linux/arm64` index carrying Adoptium's
+Java 25 JRE on a distroless base, so there is no shell, no package manager and
+no JDK tooling in it. `USER` is a numeric 65532, which is what lets Kubernetes
+`runAsNonRoot` enforce it without an `/etc/passwd` lookup, and `/tmp` is the
+only path the process writes.
+
+> **Note:** the image compiles its own jar from source in a build stage. That
+> jar is not the signed artifact attached to the GitHub Release, and no
+> reproducibility gate compares the two. What covers the image is the image's
+> own signature, provenance and SBOM
+> ([Supply chain](../security/supply-chain.md)).
 
 Verify it before you run it. The signature and the provenance sit in the
 registry beside the image, so this needs nothing downloaded first:

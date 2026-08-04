@@ -162,6 +162,26 @@ helm template cp deploy/helm/sessionlayer-controlplane \
 Summary: 6 resources found parsing stdin - Valid: 6, Invalid: 0, Errors: 0, Skipped: 0
 ```
 
+> **Warning:** `helm lint` exits 0 when a required value is missing. It reports
+> each one as `[INFO]` and still prints `0 chart(s) failed`:
+>
+> ```console
+> $ helm lint deploy/helm/sessionlayer-controlplane
+> engine.go:214: [INFO] Missing required value: sessionlayer-controlplane: set secrets.existingSecret to the name of a Secret carrying SPRING_FLYWAY_PASSWORD, ...
+> engine.go:214: [INFO] Missing required value: sessionlayer-controlplane: set recording.worm.endpoint to your WORM object store's URL. ...
+> ==> Linting deploy/helm/sessionlayer-controlplane
+> [INFO] Chart.yaml: icon is recommended
+>
+> 1 chart(s) linted, 0 chart(s) failed
+> $ echo $?
+> 0
+> ```
+>
+> A clean lint tells you the chart's structure and schema are sound and tells
+> you nothing about whether it would refuse an unsafe install. `helm template`
+> is the command that fails on a missing credential, which is why both are run
+> above and why neither substitutes for the other.
+
 Each chart's `ci/` directory holds the values file it is linted and
 schema-checked against, with every optional path switched on. Start from it
 when you want to see what a fully-configured render looks like.
