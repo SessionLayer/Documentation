@@ -124,6 +124,42 @@ covers reading the image's SBOM and the rest of the release evidence.
 > `SL_CSP_CONNECT_SRC` is the exception: it is applied to the served response
 > headers at container start, so it stays a runtime value either way.
 
+## Deploy on Kubernetes
+
+`deploy/helm/sessionlayer-dashboard` renders a Deployment, a Service, a
+ServiceAccount, a PodDisruptionBudget and a NetworkPolicy. It references no
+Secret beyond `imagePullSecrets`, because the bundle holds no credential:
+
+```bash
+helm install dashboard deploy/helm/sessionlayer-dashboard \
+  --namespace sessionlayer \
+  --set image.digest="$DIGEST" \
+  --set 'csp.connectSrc={https://cp.example.com,https://idp.example.com,https://s3.example.com}'
+```
+
+`csp.connectSrc` is the header value discussed above, and empty collapses
+`connect-src` to `'self'`. That is the fail-closed direction: a single-origin
+deployment behind one reverse proxy needs nothing here, and every other
+deployment gets a visible failure rather than a quiet widening.
+
+`image.digest` carries more weight here than for the other three components.
+The Control Plane URL and the identity provider are compiled into the bundle,
+so the tag alone does not say which deployment an image belongs to.
+
+The chart's NetworkPolicy allows egress to cluster DNS and nothing else, since
+the browser fetches the API, the identity provider and the object store
+directly. Ingress on the container port is open to the whole cluster by
+default, which is what an ingress controller in an arbitrary namespace needs.
+Narrow it with `networkPolicy.ingressFromPodSelector` and
+`networkPolicy.ingressFromNamespaceSelector` once you know your controller's
+labels.
+
+TLS is terminated in front of the pod. The image sends HSTS on every response
+and the OIDC flow refuses a cleartext endpoint, so a plain-HTTP ingress in
+front of it is a broken deployment, not a relaxed one.
+[Deploy with Helm](helm.md) covers what all four charts have in common, and the
+static-validation-only status they ship with.
+
 ## Log in
 
 Browse to the Dashboard origin and sign in through your IdP. The Dashboard is
