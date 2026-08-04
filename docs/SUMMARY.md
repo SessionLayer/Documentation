@@ -6,6 +6,7 @@
   - [How SessionLayer compares](getting-started/how-it-compares.md)
 - [Installation](installation/requirements.md)
   - [Requirements](installation/requirements.md)
+  - [Deploy with Helm](installation/helm.md)
   - [Install the Control Plane](installation/control-plane.md)
   - [Install the Gateway](installation/gateway.md)
   - [Install the Agent](installation/agent.md)

@@ -67,20 +67,6 @@ directly and sits outside what CSP's `style-src` governs. `e2e/csp.spec.ts`
 loads the authenticated app under this exact policy and asserts zero
 violations.
 
-Container example:
-
-```bash
-docker build -f deploy/Dockerfile \
-  --build-arg VITE_CP_BASE_URL=https://cp.example.com \
-  --build-arg VITE_OIDC_ISSUER=https://idp.example.com \
-  --build-arg VITE_OIDC_CLIENT_ID=sessionlayer-dashboard \
-  -t sessionlayer-dashboard .
-
-docker run -d -p 8443:8080 \
-  -e SL_CSP_CONNECT_SRC="https://cp.example.com https://idp.example.com https://s3.example.com" \
-  sessionlayer-dashboard
-```
-
 > **Warning:** `connect-src` must list all three origins: the Control Plane,
 > the OIDC token endpoint, and the object store. Omit one and the matching flow
 > breaks: data loads, login, or recording replay respectively. Unset
@@ -88,6 +74,55 @@ docker run -d -p 8443:8080 \
 > the still-encrypted object directly from the signed URL, never through the
 > API, which is exactly why the object-store origin appears here and why no
 > bearer token ever reaches the object store.
+
+## Run the published image
+
+```bash
+docker pull ghcr.io/sessionlayer/dashboard:v0.0.2
+```
+
+`v0.0.2` is the release tag; substitute the one you are installing. There is no
+`:latest`. The image is a `linux/amd64` + `linux/arm64` index, serving `dist/`
+behind unprivileged nginx on port 8080 as uid 101.
+
+Verify it before you run it:
+
+```bash
+DIGEST=$(docker buildx imagetools inspect ghcr.io/sessionlayer/dashboard:v0.0.2 \
+  --format '{{json .Manifest}}' | jq -r .digest)
+
+cosign verify "ghcr.io/sessionlayer/dashboard@$DIGEST" \
+  --certificate-identity "https://github.com/SessionLayer/Dashboard/.github/workflows/release.yml@refs/tags/v0.0.2" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+
+gh attestation verify "oci://ghcr.io/sessionlayer/dashboard@$DIGEST" \
+  --repo SessionLayer/Dashboard
+```
+
+```bash
+docker run -d -p 8443:8080 \
+  -e SL_CSP_CONNECT_SRC="https://cp.example.com https://idp.example.com https://s3.example.com" \
+  "ghcr.io/sessionlayer/dashboard@$DIGEST"
+```
+
+Deploy `$DIGEST`, not the tag. [Supply chain](../security/supply-chain.md)
+covers reading the image's SBOM and the rest of the release evidence.
+
+> **Warning:** the endpoints are compiled into the bundle, and the release
+> build passes no `VITE_*` values, so the published image talks to
+> `http://localhost:8080` and no identity provider. It is an evaluation
+> artifact. Every real deployment builds its own image with its own endpoints:
+>
+> ```bash
+> docker build -f deploy/Dockerfile \
+>   --build-arg VITE_CP_BASE_URL=https://cp.example.com \
+>   --build-arg VITE_OIDC_ISSUER=https://idp.example.com \
+>   --build-arg VITE_OIDC_CLIENT_ID=sessionlayer-dashboard \
+>   -t sessionlayer-dashboard .
+> ```
+>
+> `SL_CSP_CONNECT_SRC` is the exception: it is applied to the served response
+> headers at container start, so it stays a runtime value either way.
 
 ## Log in
 

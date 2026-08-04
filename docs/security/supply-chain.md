@@ -2,25 +2,40 @@
 
 Every SessionLayer release ships with the evidence you need to prove that
 what you run is what the public CI built from the public source: SLSA
-provenance, a keyless Sigstore signature, a CycloneDX SBOM, and a
-reproducible-build gate. This guide shows you how to verify a release, and,
-for the Agent, how nodes verify themselves before every run and update.
+provenance, a keyless Sigstore signature, an SBOM, and a reproducible-build
+gate. This guide shows you how to verify a release, and, for the Agent, how
+nodes verify themselves before every run and update.
 
-What each release artifact carries:
+A release has two artifact classes, and both carry that evidence. The GitHub
+Release holds the jar, the binaries and the static bundle. GHCR holds one
+container image per component:
 
-| Evidence | What it proves | Format |
-|---|---|---|
-| SLSA provenance (Build L2) | which repository, workflow, and tag built the artifact | Sigstore attestation bundle |
-| Keyless cosign signature | the artifact is signed by that CI identity, no signing key exists at rest, anywhere | Sigstore bundle |
-| CycloneDX SBOM | the full dependency inventory (itself signed and attested) | CycloneDX JSON |
-| Reproducible double-build | the release pipeline builds twice in clean trees and fails on any digest drift | release-gate check |
+| Component | Image |
+|---|---|
+| Control Plane | `ghcr.io/sessionlayer/controlplane` |
+| Gateway | `ghcr.io/sessionlayer/gateway` |
+| Agent | `ghcr.io/sessionlayer/agent` |
+| Dashboard | `ghcr.io/sessionlayer/dashboard` |
 
-A release is the jar or binary and its evidence. No container image is
-published, so there is no image signature or image provenance to check: an
-image you run is one you built, and the chain of custody you can verify ends
-at the artifact you built it from. The `image:` reference in every shipped
-Kubernetes manifest is a placeholder for your own registry
-([Install the Control Plane](../installation/control-plane.md)).
+Each image is a multi-arch index covering `linux/amd64` and `linux/arm64`,
+tagged with the release tag and nothing else. No `:latest` is published: a
+floating tag is a reference whose bytes change under you, which is the one
+thing every other control on this page exists to prevent.
+
+What the evidence is:
+
+| Evidence | What it proves | Format | Where |
+|---|---|---|---|
+| SLSA provenance (Build L2) | which repository, workflow, and tag built the artifact | Sigstore attestation bundle | release asset; registry attestation |
+| Keyless cosign signature | the artifact is signed by that CI identity, no signing key exists at rest, anywhere | Sigstore bundle | release asset; registry signature |
+| CycloneDX SBOM | the full dependency inventory of the built application (itself signed and attested) | CycloneDX JSON | release asset |
+| SPDX SBOM | what a scanner finds in the built image, one document per platform | in-toto attestation | image index |
+| Reproducible double-build | the release pipeline builds twice in clean trees and fails on any digest drift | release-gate check | binaries and jar |
+
+The two SBOM formats answer different questions and neither replaces the
+other. The CycloneDX document inventories the dependencies the application
+was compiled or bundled from; the SPDX document inventories the packages
+present in the image you pull, base layers included.
 
 Signing is keyless: the CI's ephemeral GitHub OIDC identity gets a
 short-lived certificate from Fulcio, and the signing event is logged to
@@ -93,9 +108,10 @@ separate "release" button or manual dispatch. Before tagging:
 
 ## Verify any release artifact
 
-With the GitHub CLI, against the repository's attestations. The bare form
-below only confirms the attestation traces back to some workflow in
-`SessionLayer/Agent`. Pin the exact tag and workflow with
+With the GitHub CLI, against the repository's attestations. `v0.0.2` in every
+command on this page is the release tag you downloaded; substitute the one you
+are installing. The bare form below only confirms the attestation traces back
+to some workflow in `SessionLayer/Agent`. Pin the exact tag and workflow with
 `--cert-identity`/`--source-ref` (or `--signer-workflow`) for the strict
 check a real install should use:
 
@@ -104,9 +120,9 @@ gh attestation verify sessionlayer-agent --repo SessionLayer/Agent
 
 # strict: pin the exact release identity, not any workflow in this repo
 gh attestation verify sessionlayer-agent --repo SessionLayer/Agent \
-  --cert-identity "https://github.com/SessionLayer/Agent/.github/workflows/release.yml@refs/tags/v0.0.1" \
+  --cert-identity "https://github.com/SessionLayer/Agent/.github/workflows/release.yml@refs/tags/v0.0.2" \
   --cert-oidc-issuer "https://token.actions.githubusercontent.com" \
-  --source-ref "refs/tags/v0.0.1"
+  --source-ref "refs/tags/v0.0.2"
 ```
 
 Or with cosign, pinning the exact workflow identity the release pipeline
@@ -115,7 +131,7 @@ signs as:
 ```bash
 cosign verify-blob sessionlayer-agent \
   --bundle sessionlayer-agent.cosign.sigstore.json \
-  --certificate-identity "https://github.com/SessionLayer/Agent/.github/workflows/release.yml@refs/tags/v0.0.1" \
+  --certificate-identity "https://github.com/SessionLayer/Agent/.github/workflows/release.yml@refs/tags/v0.0.2" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 # Verified OK
 ```
@@ -136,6 +152,93 @@ artifacts and their SBOMs (adjust repo, artifact, and tag).
 > `SHA256SUMS` is not a substitute for the `gh attestation verify` /
 > `cosign verify-blob` commands above; use it only as a quick corruption
 > check on top of them, never instead of them.
+
+## Verify a container image
+
+An image's signature and attestations live in the registry beside it, so
+there is nothing to download first: resolve the tag to a digest, then check
+everything against that digest.
+
+```bash
+DIGEST=$(docker buildx imagetools inspect ghcr.io/sessionlayer/gateway:v0.0.2 \
+  --format '{{json .Manifest}}' | jq -r .digest)
+
+cosign verify "ghcr.io/sessionlayer/gateway@$DIGEST" \
+  --certificate-identity "https://github.com/SessionLayer/Gateway/.github/workflows/release.yml@refs/tags/v0.0.2" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+```
+
+The identity is the binary one with the repository swapped:
+`SessionLayer/ControlPlane`, `SessionLayer/Gateway`, `SessionLayer/Agent`,
+`SessionLayer/Dashboard`. Signing is recursive, so the per-platform manifest
+your node resolves the index to verifies under that same identity, not only
+the index you asked about.
+
+Then the provenance pushed alongside it, which names the workflow, tag and
+commit that produced this exact digest:
+
+```bash
+gh attestation verify "oci://ghcr.io/sessionlayer/gateway@$DIGEST" \
+  --repo SessionLayer/Gateway
+```
+
+> **Note:** if `docker buildx imagetools inspect` cannot read the index, log
+> in to `ghcr.io` first with a token carrying `read:packages`. A registry
+> permission error and a missing image look alike from the client side.
+
+### Read the SBOM
+
+The build attaches one SPDX document per platform to the index as an in-toto
+attestation. Read it out of the registry without pulling the image:
+
+```bash
+docker buildx imagetools inspect "ghcr.io/sessionlayer/gateway@$DIGEST" \
+  --format '{{json .SBOM}}' \
+  | jq -r '.. | objects | select(has("packages")) | .packages[]
+           | "\(.name) \(.versionInfo // "")"' | sort -u
+```
+
+It covers what a scanner finds in the image that ships, base layers included.
+For the application's own dependency tree, use the CycloneDX SBOM attached to
+the GitHub Release.
+
+### Confirm the architectures
+
+```bash
+docker buildx imagetools inspect "ghcr.io/sessionlayer/gateway@$DIGEST" \
+  --format '{{json .Manifest}}' \
+  | jq -r '.manifests[].platform | "\(.os)/\(.architecture)"' | sort -u
+```
+
+Expect `linux/amd64` and `linux/arm64`, alongside `unknown/unknown` entries.
+Those last ones are not architectures. An attestation manifest carries that
+platform by convention, and they hold the SBOM and provenance read above.
+
+### Pin the digest, not the tag
+
+A published git tag cannot be moved: every repository carries a ruleset that
+blocks `update` and `deletion` on `refs/tags/v*`, with no bypass. A registry
+tag has no such protection. Re-pushing `vX.Y.Z` points it at different bytes
+and leaves nothing behind to notice. Deploy the digest you verified, and a
+substituted image fails to pull instead of starting:
+
+```yaml
+image: ghcr.io/sessionlayer/gateway@sha256:<the digest cosign verified>
+```
+
+The Helm charts take that digest directly as `image.digest`, which wins over
+`image.tag` whenever both are set ([Deploy with Helm](../installation/helm.md)).
+
+> **Warning:** the release pushes the image before it verifies it. A run that
+> fails its own verification step therefore leaves an image in the registry
+> that the pipeline refused to certify, under a tag that exists. That the tag
+> resolves is not evidence of anything; the `cosign verify` above is.
+
+The verification the release runs on itself asserts values rather than exit
+codes: at least one signature returned, `gh attestation verify` passing, the
+index containing exactly `amd64` and `arm64`, and an SBOM attestation with a
+non-zero component count. Each is the check that would catch an empty index,
+an unsigned image, or an SBOM with nothing in it.
 
 ## The Agent: verify-before-run and verify-before-update
 
@@ -284,7 +387,9 @@ then `cargo build --release --locked --bin sessionlayer-agent`.
 
 Every release attaches a CycloneDX SBOM per artifact (spec 1.5 for the two
 Rust components, the tooling maximum, and 1.6 for the JVM and npm ones),
-signed and provenance-attested like the artifact itself. Feed them to your
+signed and provenance-attested like the artifact itself. Every image carries
+an SPDX document per platform as a registry attestation, covering the shipped
+filesystem rather than the source dependency tree. Feed both to your
 vulnerability-management tooling; the platform's own dependency posture is
 pinned toolchains, committed lockfiles, an exact-match license allow-list,
 and a hard ban on the OpenSSL C stack in the Rust components.

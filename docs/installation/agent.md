@@ -113,31 +113,106 @@ Linux ≥ 6.7), the Agent degrades with a loud, logged Accepted-Risk instead of
 refusing to start; `--require-full-landlock` turns that degrade into a
 startup failure for regimes that cannot accept it.
 
-No container image is published for any SessionLayer component, so build one
-from the `Dockerfile` at the repository root:
+## Run it in a container
 
 ```bash
-docker build -t sessionlayer-agent .
+docker pull ghcr.io/sessionlayer/agent:v0.0.2
 ```
 
-The reference container runs as uid 65532 with a read-only rootfs and the
-data directory as its only writable volume:
+`v0.0.2` is the release tag; substitute the one you are installing. There is no
+`:latest`. The image is a `linux/amd64` + `linux/arm64` index, has no shell in
+the final layer, and holds the same posture the section above describes: uid
+65532 baked in numerically, a read-only rootfs, and the data directory as its
+only writable path.
+
+Verify it before you run it, the same way and against the same identity as the
+binary:
+
+```bash
+DIGEST=$(docker buildx imagetools inspect ghcr.io/sessionlayer/agent:v0.0.2 \
+  --format '{{json .Manifest}}' | jq -r .digest)
+
+cosign verify "ghcr.io/sessionlayer/agent@$DIGEST" \
+  --certificate-identity "https://github.com/SessionLayer/Agent/.github/workflows/release.yml@refs/tags/v0.0.2" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+
+gh attestation verify "oci://ghcr.io/sessionlayer/agent@$DIGEST" \
+  --repo SessionLayer/Agent
+```
 
 ```bash
 docker run --read-only \
   --user 65532:65532 \
   --security-opt no-new-privileges \
   -v sl-agent-data:/var/lib/sessionlayer-agent \
-  sessionlayer-agent run ...
+  "ghcr.io/sessionlayer/agent@$DIGEST" run ...
 ```
 
-For Kubernetes, `deploy/kubernetes/agent-daemonset.yaml` is a reference
-DaemonSet with the same posture, and `deploy/kubernetes/agent-networkpolicy.yaml`
-denies all inbound traffic and scopes egress to the Control Plane, the
-configured Gateways, and DNS. Its `image:` line names
-`ghcr.io/sessionlayer/agent:latest`, which is a placeholder like the others:
-push the image you built to a registry your nodes can pull from and point the
-DaemonSet at it, or the pods stay in `ImagePullBackOff`.
+Build your own from `deploy/Dockerfile` instead if you prefer, and then your
+build is your provenance:
+
+```bash
+docker build -f deploy/Dockerfile -t sessionlayer-agent .
+```
+
+> **Warning:** `--verify-self` does not carry over to the container. The
+> binary inside the image is compiled by the image build, so it is not the
+> released binary and the release's blob signature does not cover its bytes.
+> Pointing `--self-blob-bundle` at a downloaded release bundle refuses to
+> start (exit 2), correctly. The image's own signature and provenance are what
+> cover what is in it: verify the digest, deploy the digest.
+
+## Deploy on Kubernetes
+
+`deploy/helm/sessionlayer-agent` renders a DaemonSet, a ServiceAccount and a
+NetworkPolicy. The Agent takes flags rather than a config file, so the chart
+builds an argument list. It creates no Secret:
+
+```bash
+kubectl -n sessionlayer create configmap sessionlayer-bootstrap-ca \
+  --from-file=ca.pem=cp-mtls-ca.pem
+
+helm install agent deploy/helm/sessionlayer-agent \
+  --namespace sessionlayer \
+  --set trustAnchor.existingConfigMap=sessionlayer-bootstrap-ca \
+  --set image.digest="$DIGEST" \
+  --set hostNetwork=true \
+  --set 'gateways[0].endpoint=wss://gw-a.example.com:9444' \
+  --set 'gateways[0].serverName=gw-a'
+```
+
+`join.method` defaults to `oidc`, where the kubelet projects a ServiceAccount
+token for the audience the Control Plane validates
+(`join.audience`, matching `sessionlayer.agent-join.oidc.audience`). The
+`token` and `mtls` methods read a Secret you name in `join.existingSecret`.
+
+Set `hostNetwork=true` for the DaemonSet's stated job. The Agent refuses any
+splice address that is not loopback, and a pod's loopback is not the node's, so
+without it `--splice-addr` reaches nothing and every session to the node fails
+to connect. Weigh that against sharing the node's network namespace.
+
+The chart refuses to render rather than installing something that looks healthy
+and works for nothing:
+
+| Condition | Why it refuses |
+|---|---|
+| `gateways` empty | The Agent would join the Control Plane, hold an identity, and serve no session. |
+| A `gateways` entry with no `serverName` | The binary's fallback is a development name, so the TLS handshake fails with nothing naming the cause. |
+| `failureDomain` on some entries but not all | The binary aligns the flags by position and refuses a partial list. |
+| `minControlChannels` above the number of entries | The Agent can never reach its own floor, so it never becomes healthy. |
+| No `trustAnchor.existingConfigMap` | The Agent pins the Control Plane's CA and performs no trust-on-first-use. |
+| `terminationGracePeriodSeconds` below `drainDeadlineSecs` | A SIGKILL landing in the credential-persist window leaves a generation the Control Plane reads as a clone and auto-locks, turning a routine node drain into a manual re-provision. |
+
+`minControlChannels` stays at `1` by default. Raising it, with Gateways in
+different failure domains, is what makes a single Gateway outage a non-event.
+
+The plain manifests remain the non-Helm reference:
+`deploy/kubernetes/agent-daemonset.yaml` carries the same posture, and
+`deploy/kubernetes/agent-networkpolicy.yaml` denies all inbound traffic and
+scopes egress to the Control Plane, the configured Gateways, and DNS. Their
+`image:` line names the release tag; replace it with the digest you verified.
+[Deploy with Helm](helm.md) covers what all four charts have in common, and the
+static-validation-only status they ship with.
 
 ## Exit codes your supervisor should know
 

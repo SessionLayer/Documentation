@@ -19,7 +19,7 @@ Prerequisites:
 
 | | Container (Kubernetes) | Bare-metal / VM (systemd) |
 |---|---|---|
-| Assets | `deploy/Dockerfile` + `deploy/kubernetes/control-plane.yaml` | `deploy/systemd/sessionlayer-control-plane.service` |
+| Assets | `deploy/helm/sessionlayer-controlplane/`, or `deploy/kubernetes/control-plane.yaml` | `deploy/systemd/sessionlayer-control-plane.service` |
 | Identity | non-root (uid 10000), read-only rootfs | `DynamicUser=yes`: no privileged port to bind, no local state to keep a stable UID for |
 | Config | a ConfigMap + a Secret, both plain `SPRING_*`/`SESSIONLAYER_*` env vars | one `EnvironmentFile` |
 | Egress control | `deploy/kubernetes/networkpolicy.yaml` | host firewall |
@@ -29,7 +29,36 @@ local persistent state (every secret lives in Postgres or the mounted config
 above), so there is no privilege-drop-after-bind step and no data volume to
 provision either way.
 
-## Build it
+## Get it
+
+```bash
+docker pull ghcr.io/sessionlayer/controlplane:v0.0.2
+```
+
+`v0.0.2` is the release tag; substitute the one you are installing. There is no
+`:latest`. The image is a `linux/amd64` + `linux/arm64` index.
+
+Verify it before you run it. The signature and the provenance sit in the
+registry beside the image, so this needs nothing downloaded first:
+
+```bash
+DIGEST=$(docker buildx imagetools inspect ghcr.io/sessionlayer/controlplane:v0.0.2 \
+  --format '{{json .Manifest}}' | jq -r .digest)
+
+cosign verify "ghcr.io/sessionlayer/controlplane@$DIGEST" \
+  --certificate-identity "https://github.com/SessionLayer/ControlPlane/.github/workflows/release.yml@refs/tags/v0.0.2" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+
+gh attestation verify "oci://ghcr.io/sessionlayer/controlplane@$DIGEST" \
+  --repo SessionLayer/ControlPlane
+```
+
+Deploy `$DIGEST`, not the tag. A registry tag can be re-pushed to different
+bytes and every manifest naming it looks unchanged.
+[Supply chain](../security/supply-chain.md) covers reading the image's SBOM and
+the rest of the release evidence.
+
+To run the jar directly, or to build either artifact yourself:
 
 ```bash
 git clone https://github.com/SessionLayer/ControlPlane.git
@@ -139,7 +168,7 @@ docker run -d --name sessionlayer-controlplane \
   -e SESSIONLAYER_MTLS_SERVER_PORT=9443 \
   --read-only --tmpfs /tmp:rw,exec,nosuid,size=256m \
   -p 8080:8080 -p 9443:9443 \
-  sessionlayer-controlplane
+  "ghcr.io/sessionlayer/controlplane@$DIGEST"
 ```
 
 The image's `EXPOSE` line names `9443`, but nothing in it sets the port, so
@@ -151,22 +180,60 @@ built-in `9090`. Drop it and the published `9443` reaches nothing.
 > starts (it falls back to NIO with a log warning), but pass `exec` to keep
 > the native transport available.
 
-### Kubernetes
+### Kubernetes, with Helm
 
-No container image is published for any SessionLayer component, so the
-`image: ghcr.io/sessionlayer/controlplane:latest` line in
-`deploy/kubernetes/control-plane.yaml` is a placeholder, not a pullable
-reference. Push your own first, replacing `registry.example.com` with a
-registry your cluster can pull from and `<tag>` with however you version
-images:
+`deploy/helm/sessionlayer-controlplane` renders a Deployment, a Service, a
+ConfigMap, a ServiceAccount, a PodDisruptionBudget and a NetworkPolicy. It
+creates no Secret, so make yours first, from the key list in
+`deploy/kubernetes/secret.example.yaml`:
 
 ```bash
-docker build -f deploy/Dockerfile -t registry.example.com/sessionlayer/controlplane:<tag> .
-docker push registry.example.com/sessionlayer/controlplane:<tag>
+kubectl create namespace sessionlayer
+kubectl -n sessionlayer apply -f my-controlplane-secrets.yaml
+
+helm install cp deploy/helm/sessionlayer-controlplane \
+  --namespace sessionlayer \
+  --set secrets.existingSecret=sessionlayer-controlplane-secrets \
+  --set image.digest="$DIGEST" \
+  --set recording.worm.endpoint=https://worm.example.com \
+  --set oidc.issuer=https://idp.example.com \
+  --set oidc.clientId=sessionlayer-controlplane \
+  --set oidc.redirectUri=https://cp.example.com/v1/auth/callback
 ```
 
-Point the manifest's `image:` at what you pushed, by digest rather than tag
-for production, then apply:
+Replace the `worm` and `idp` hosts with your object store and identity
+provider. For an OTP, pins or machine-identity-only deployment, drop the three
+`oidc.*` values and set `oidc.enabled=false` instead.
+
+The values that decide whether the install is a safe one:
+
+| Value | Default | Why it decides |
+|---|---|---|
+| `secrets.existingSecret` | `""` | Names the Secret carrying the two database passwords, the CA key-encryption key, the OIDC client secret and state HMAC key, and the object-store credentials. Rendering fails without it, naming every key. |
+| `recording.worm.endpoint` | `""` | Required. The application's own default points at a development MinIO with a well-known credential. |
+| `image.digest` | `""` | Wins over `image.tag`. Pin the digest you verified above. |
+| `networkPolicy.enabled` | `true` | Default-deny in both directions. `wormCidrs` and `oidcCidrs` start empty, so egress to your object store and IdP is denied until you name the ranges. |
+| `podDisruptionBudget.minAvailable` | `1` | Rendering fails when this is not below `replicaCount`, because such a budget refuses every voluntary eviction and hangs a node drain. |
+| `serviceAccount.automountServiceAccountToken` | `false` | The Control Plane never calls the Kubernetes API, so a projected token is credential surface with no purpose. |
+
+No value turns on the development key-encryption key. Doing that takes a
+deliberate `extraEnv` entry, which is the point: a chart that defaulted one so
+the install "worked" would have wrapped every certificate authority private key
+under a public constant.
+
+The chart runs no migration Job and no init container. Flyway runs inside
+Spring's context refresh, and `/actuator/health/readiness` does not report
+ready until it and both bootstrap runners have finished, so the readiness probe
+is what gates traffic on the migration. `probes.startup.failureThreshold` of 60
+allows five minutes for it, which also covers a second replica waiting out
+Flyway's database-level lock during a rolling update. Lowering it is how a slow
+first migration becomes a restart loop.
+
+The chart's own `README.md` documents every value.
+[Deploy with Helm](helm.md) covers what all four charts have in common, and
+the static-validation-only status they ship with.
+
+### Kubernetes, plain manifests
 
 ```bash
 kubectl create namespace sessionlayer
@@ -175,11 +242,6 @@ kubectl apply -n sessionlayer -f deploy/kubernetes/networkpolicy.yaml
 kubectl apply -n sessionlayer -f deploy/kubernetes/secret.example.yaml
 kubectl apply -n sessionlayer -f deploy/kubernetes/control-plane.yaml
 ```
-
-> **Warning:** applying the manifest with the placeholder `image:` unchanged
-> leaves the pods in `ImagePullBackOff`, since that repository does not exist.
-> The readiness probe never passes and nothing in the platform reports a
-> configuration fault, because none of it started.
 
 `deploy/kubernetes/control-plane.yaml` ships a Deployment (2 replicas), a
 Service named `controlplane`, a ConfigMap, and a PodDisruptionBudget. Its
@@ -190,6 +252,9 @@ mid-migration. Running two replicas through a rolling update can run Flyway
 from two pods at once; this is safe by construction, since Flyway takes a
 Postgres-level lock before migrating, so the second pod's Flyway blocks, then
 finds nothing left to apply.
+
+Its `image:` line names the release tag. Replace it with the digest you
+verified before applying, for the same reason the chart takes one.
 
 ### systemd (bare metal)
 
