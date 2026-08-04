@@ -13,6 +13,9 @@ reach directly are better served agentless: nothing to install at all. See
 
 Prerequisites:
 
+- [ ] the node registered by an admin with `"connectorKind": "agent"` and its
+      host-identity anchor ([Nodes](../admin-guides/nodes.md)), under the same
+      name you pass to `--node-name`
 - [ ] a join credential from an admin: a join token
       (`POST /v1/join-tokens`), an OIDC workload identity, or an
       operator-PKI certificate
@@ -77,6 +80,12 @@ sessionlayer-agent run \
 The Agent generates its keypair locally and sends only a CSR; the private key
 never leaves the node (stored `0600`, zeroized in memory). It receives a
 generation-0 mTLS identity and renews ahead of expiry for as long as it runs.
+
+`--node-name` is the join key. It attaches the Agent to the node an admin
+registered under that name, which is where the node's host-identity anchor
+lives. A name registered for the agentless connector is refused, and a name
+that does not exist yet creates an anchorless node that can carry no session.
+Confirm the registration before the first run.
 
 Three join methods, one outcome (the renewable identity is identical
 regardless):
