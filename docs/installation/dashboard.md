@@ -85,6 +85,22 @@ docker pull ghcr.io/sessionlayer/dashboard:v0.0.2
 `:latest`. The image is a `linux/amd64` + `linux/arm64` index, serving `dist/`
 behind unprivileged nginx on port 8080 as uid 101.
 
+> **Warning:** the endpoints are compiled into the bundle, and the release
+> build passes no `VITE_*` values, so the published image talks to
+> `http://localhost:8080` and no identity provider. It is an evaluation
+> artifact. Every real deployment builds its own image with its own endpoints:
+>
+> ```bash
+> docker build -f deploy/Dockerfile \
+>   --build-arg VITE_CP_BASE_URL=https://cp.example.com \
+>   --build-arg VITE_OIDC_ISSUER=https://idp.example.com \
+>   --build-arg VITE_OIDC_CLIENT_ID=sessionlayer-dashboard \
+>   -t sessionlayer-dashboard .
+> ```
+>
+> `SL_CSP_CONNECT_SRC` is the exception: it is applied to the served response
+> headers at container start, so it stays a runtime value either way.
+
 Verify it before you run it:
 
 ```bash
@@ -105,24 +121,9 @@ docker run -d -p 8443:8080 \
   "ghcr.io/sessionlayer/dashboard@$DIGEST"
 ```
 
-Deploy `$DIGEST`, not the tag. [Supply chain](../security/supply-chain.md)
-covers reading the image's SBOM and the rest of the release evidence.
-
-> **Warning:** the endpoints are compiled into the bundle, and the release
-> build passes no `VITE_*` values, so the published image talks to
-> `http://localhost:8080` and no identity provider. It is an evaluation
-> artifact. Every real deployment builds its own image with its own endpoints:
->
-> ```bash
-> docker build -f deploy/Dockerfile \
->   --build-arg VITE_CP_BASE_URL=https://cp.example.com \
->   --build-arg VITE_OIDC_ISSUER=https://idp.example.com \
->   --build-arg VITE_OIDC_CLIENT_ID=sessionlayer-dashboard \
->   -t sessionlayer-dashboard .
-> ```
->
-> `SL_CSP_CONNECT_SRC` is the exception: it is applied to the served response
-> headers at container start, so it stays a runtime value either way.
+Deploy `$DIGEST`, not the tag, whether it is the published image or your own
+pushed to your own registry. [Supply chain](../security/supply-chain.md) covers
+reading the image's SBOM and the rest of the release evidence.
 
 ## Deploy on Kubernetes
 
