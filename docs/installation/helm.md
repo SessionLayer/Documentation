@@ -1,10 +1,9 @@
 # Deploy with Helm
 
 Each component ships its own chart, inside its own repository, under
-`deploy/helm/`. There is no umbrella chart. The four components have
-independent release cadences and independent blast radii, and a chart that
-rolled the Control Plane every time a Gateway value changed would be the
-wrong shape for both.
+`deploy/helm/`. There is no umbrella chart: the four components version and
+roll independently, and one release object spanning all of them would couple
+every upgrade to every other.
 
 | Component | Chart | Repository |
 |---|---|---|
@@ -95,8 +94,10 @@ The order is the platform's trust order, not a Helm constraint:
    mTLS CA on first boot, and nothing else can enroll until it is ready.
 2. Gateway. Enrolling needs a running Control Plane, the mTLS trust anchor,
    and a single-use enrollment token you mint over the API.
-3. Agent and Dashboard, in either order. Both need a Control Plane; neither
-   needs the other.
+3. Agent. Its chart refuses to render without at least one Gateway endpoint
+   and the name that Gateway enrolled under, so the Gateway comes first.
+4. Dashboard, at any point after the Control Plane. Nothing depends on it and
+   it depends on nothing but the API.
 
 Each component's installation page covers its own chart's values and the
 out-of-band steps around it:
