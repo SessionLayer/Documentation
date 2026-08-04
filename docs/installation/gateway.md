@@ -28,7 +28,7 @@ Prerequisites:
 | Privilege | starts non-root (uid 65532) | starts root, drops after bind |
 | Assets | `deploy/helm/sessionlayer-gateway/`, or `deploy/kubernetes/gateway.yaml` | `deploy/systemd/sessionlayer-gateway.service` |
 | Filesystem | read-only rootfs + Landlock | `ProtectSystem=strict` + Landlock |
-| Egress control | `deploy/kubernetes/networkpolicy.yaml` | host firewall |
+| Egress control | the chart's `networkPolicy.*`, or `deploy/kubernetes/networkpolicy.yaml` | host firewall |
 
 `deploy/kubernetes/gateway.yaml` ships a Deployment, a ConfigMap, and a
 `LoadBalancer` Service mapping port `22` to the container's `2222`. Its
@@ -269,6 +269,14 @@ one that does. See [High availability](../admin-guides/high-availability.md).
 The plain manifests remain the non-Helm reference. Apply
 `deploy/kubernetes/networkpolicy.yaml` and `deploy/kubernetes/gateway.yaml`,
 replacing the manifest's `image:` tag with the digest you verified.
+
+> **Warning:** `gateway.yaml` carries `gateway.json` in a ConfigMap, with
+> `REPLACE_WITH_ENROLLMENT_TOKEN` where the token goes. Filling that in puts a
+> live credential in an object nothing treats as secret material: cluster RBAC,
+> audit policy and etcd encryption-at-rest are all configured around Secrets,
+> and a ConfigMap sits outside each of them. Move the file into a Secret before
+> you fill it in, or use the chart, which renders it into one.
+
 [Deploy with Helm](helm.md) covers what all four charts have in common, and the
 static-validation-only status they ship with.
 
