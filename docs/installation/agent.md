@@ -120,10 +120,10 @@ docker pull ghcr.io/sessionlayer/agent:v0.0.2
 ```
 
 `v0.0.2` is the release tag; substitute the one you are installing. There is no
-`:latest`. The image is a `linux/amd64` + `linux/arm64` index, has no shell in
-the final layer, and holds the same posture the section above describes: uid
-65532 baked in numerically, a read-only rootfs, and the data directory as its
-only writable path.
+`:latest`. The image is a `linux/amd64` + `linux/arm64` index with no shell in
+the final layer and a numeric `USER 65532`, so `runAsNonRoot` can enforce it
+without an `/etc/passwd` lookup. `/var/lib/sessionlayer-agent` is the only path
+the process writes, which is what makes a read-only root filesystem hold.
 
 Verify it before you run it, the same way and against the same identity as the
 binary:
