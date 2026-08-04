@@ -86,21 +86,32 @@ docker pull ghcr.io/sessionlayer/dashboard:v0.0.2
 behind unprivileged nginx, on port 8080 as a numeric uid 101, with `/tmp` its
 only writable path.
 
-> **Warning:** the endpoints are compiled into the bundle, and the release
-> build passes no `VITE_*` values, so the published image talks to
-> `http://localhost:8080` and no identity provider. It is an evaluation
-> artifact. Every real deployment builds its own image with its own endpoints:
->
-> ```bash
-> docker build -f deploy/Dockerfile \
->   --build-arg VITE_CP_BASE_URL=https://cp.example.com \
->   --build-arg VITE_OIDC_ISSUER=https://idp.example.com \
->   --build-arg VITE_OIDC_CLIENT_ID=sessionlayer-dashboard \
->   -t sessionlayer-dashboard .
-> ```
->
-> `SL_CSP_CONNECT_SRC` is the exception: it is applied to the served response
-> headers at container start, so it stays a runtime value either way.
+> **Warning:** the published image is an evaluation artifact and cannot be
+> repointed. Vite inlines the endpoints into the bundle at build time, and the
+> release build passes no `VITE_*` values, so that image talks to
+> `http://localhost:8080` and to no identity provider. Nothing you set at
+> runtime changes it: there is no environment variable, no config file, and no
+> mount that moves those endpoints once the bundle is built.
+
+Building your own image, with your own endpoints, is the supported path for
+every real deployment:
+
+```bash
+docker build -f deploy/Dockerfile \
+  --build-arg VITE_CP_BASE_URL=https://cp.example.com \
+  --build-arg VITE_OIDC_ISSUER=https://idp.example.com \
+  --build-arg VITE_OIDC_CLIENT_ID=sessionlayer-dashboard \
+  -t sessionlayer-dashboard .
+```
+
+Push that to a registry your cluster pulls from and deploy it by digest, the
+same way you would the published one. Runtime configuration, where the
+container reads its endpoints from the environment at start instead, does not
+exist yet.
+
+`SL_CSP_CONNECT_SRC` is the one value that is genuinely runtime: it is
+substituted into the served response headers at container start, so it belongs
+to the deployment rather than to the build.
 
 Verify it before you run it:
 

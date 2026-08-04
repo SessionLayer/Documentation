@@ -26,9 +26,8 @@ the tarball wherever your cluster's tooling reads charts from.
 
 ## Nothing installs with a working credential
 
-No chart defaults a credential to a working value. Each one is referenced by
-the name of a Secret you create out of band, and a missing reference fails at
-render time with a message naming the value and the keys it expects. The
+No chart defaults a credential to a working value. A missing one fails at
+render time with a message naming the value and the keys it expects, so the
 failure lands in your terminal, not in a `CrashLoopBackOff` an hour later:
 
 ```console
@@ -53,20 +52,37 @@ CA key-encryption key; a chart that supplied one so the install "worked" would
 have papered over the control, and every pod would carry certificate authority
 private keys wrapped under a public constant.
 
-Two consequences worth planning for:
+In the Control Plane and Agent charts every credential is a reference: you name
+a Secret you created, and the chart never sees the value. The Dashboard chart
+takes no credential at all, since the bundle holds none. Two consequences worth
+planning for:
 
-- Rotating a credential is a Secret update plus a pod restart, not a
-  `helm upgrade`.
+- Rotating one is a Secret update plus a pod restart, not a `helm upgrade`.
 - Helm stores the values a release was installed with, inside the cluster.
-  Because the credentials are references, `helm get values` returns names
-  rather than secret material.
+  Where the credential is a reference, `helm get values` returns a name rather
+  than secret material.
 
-> **Warning:** the Gateway chart is the one exception, and a deliberate one.
-> `bootstrap.enrollmentToken` can be passed as a value, which does put it in
-> Helm's release storage. The token is single-use and short-TTL, so what is
-> retained is a spent credential, but the way to avoid it entirely is
-> `config.existingSecret`: put the whole `gateway.json` in a Secret you create,
-> and the chart renders no configuration of its own.
+### The Gateway's exception
+
+The Gateway reads one JSON file, and that file carries its enrollment token.
+There is no per-field environment override, since `SL_GATEWAY_CONFIG` names the
+file's path rather than its contents, so the token has to live inside
+`gateway.json`. The chart offers the only two shapes that can be right:
+
+- `config.existingSecret` names a Secret whose `gateway.json` key holds the
+  complete file. This is the production path: the chart renders no
+  configuration of its own, and the token never reaches a values file.
+- Left unset, the chart renders `gateway.json` into a Secret it creates, from
+  `bootstrap.enrollmentToken` and the values around it. A token passed that way
+  does reach Helm's release storage, and stays in the release history.
+
+The token is single-use and short-TTL, so what release storage retains after
+enrollment is a spent credential rather than a standing one. That bounds the
+exposure. It does not remove it, which is why the first path is the one to
+deploy with.
+
+Both are stricter than the manifest the chart translates:
+`deploy/kubernetes/gateway.yaml` carries the same file in a ConfigMap.
 
 ## Pin the image by digest
 
@@ -119,10 +135,11 @@ where a placeholder range would permit egress to hosts that are not your object
 store, your identity provider or your fleet. Fill in the ranges your deployment
 needs and no more.
 
-The Dashboard is the one whose ingress side is open by default, on the
-container port, to the whole cluster. An ingress controller lives in a
-namespace the chart cannot guess, so narrowing that is left to you once you
-know your controller's labels.
+The Dashboard is the exception on its ingress side. Its rule restricts the
+port to 8080 and names no source at all, which permits every source a
+NetworkPolicy can express. An ingress controller lives in a namespace the chart
+cannot guess, so narrowing it with `networkPolicy.ingressFromPodSelector` and
+`networkPolicy.ingressFromNamespaceSelector` is left to you.
 
 All of this assumes a CNI that enforces NetworkPolicy. On one that does not,
 the objects are accepted by the API server and enforce nothing, which looks

@@ -40,9 +40,10 @@ GitHub CLI for the provenance and `docker buildx` for the SBOM
 
 Each chart lives in its component's repository and declares
 `kubeVersion: >=1.21.0-0`, the floor for a `policy/v1` PodDisruptionBudget.
-Every chart renders a default-deny NetworkPolicy unless you turn it off, which
-needs a CNI that enforces NetworkPolicy; on one that does not, the object is
-accepted and enforces nothing ([Deploy with Helm](helm.md)).
+Every chart renders a NetworkPolicy unless you turn it off, permitting only the
+peers its component talks to. That needs a CNI that enforces NetworkPolicy; on
+one that does not, the object is accepted and enforces nothing
+([Deploy with Helm](helm.md)).
 
 ## Backing services
 
