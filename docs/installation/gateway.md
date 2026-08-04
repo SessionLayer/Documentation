@@ -16,7 +16,9 @@ Prerequisites:
 
 - [ ] a running [Control Plane](control-plane.md), reachable from the Gateway
       host on the mTLS gRPC port
-- [ ] the [Gateway](https://github.com/SessionLayer/Gateway) source checkout
+- [ ] a [Gateway](https://github.com/SessionLayer/Gateway) checkout at the tag
+      you are deploying, for the chart, the manifests and the systemd unit,
+      none of which are distributed separately
 - [ ] an admin bearer token holding `gateway:enroll`, for the one-time
       enrollment steps
 

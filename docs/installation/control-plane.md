@@ -12,8 +12,9 @@ Prerequisites:
 - [ ] PostgreSQL 17 reachable, with a database and an owner role for SessionLayer
 - [ ] Java 25 to run the jar directly, or Docker/Kubernetes to run the
       container image instead
-- [ ] the [ControlPlane](https://github.com/SessionLayer/ControlPlane)
-      source checkout (every path below builds from source)
+- [ ] a [ControlPlane](https://github.com/SessionLayer/ControlPlane) checkout
+      at the tag you are deploying, for the chart, the manifests and the
+      systemd unit, none of which are distributed separately
 
 ## Pick a deployment model
 
