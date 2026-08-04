@@ -198,7 +198,9 @@ token for the audience the Control Plane validates
 Set `hostNetwork=true` for the DaemonSet's stated job. The Agent refuses any
 splice address that is not loopback, and a pod's loopback is not the node's, so
 without it `--splice-addr` reaches nothing and every session to the node fails
-to connect. Weigh that against sharing the node's network namespace.
+to connect. The chart refuses to render until you set it, which is also what
+keeps sharing the node's network namespace a decision you make rather than one
+the chart makes for you.
 
 The chart refuses to render rather than installing something that looks healthy
 and works for nothing:
@@ -210,6 +212,7 @@ and works for nothing:
 | `failureDomain` on some entries but not all | The binary aligns the flags by position and refuses a partial list. |
 | `minControlChannels` above the number of entries | The Agent can never reach its own floor, so it never becomes healthy. |
 | No `trustAnchor.existingConfigMap` | The Agent pins the Control Plane's CA and performs no trust-on-first-use. |
+| `hostNetwork` off | The splice address is loopback-only and a pod's loopback is not the node's, so the node's `sshd` is unreachable. The chart renders one container, so nothing else is listening on the pod's loopback either. |
 | `terminationGracePeriodSeconds` below `drainDeadlineSecs` | A SIGKILL landing in the credential-persist window leaves a generation the Control Plane reads as a clone and auto-locks, turning a routine node drain into a manual re-provision. |
 
 `minControlChannels` stays at `1` by default. Raising it, with Gateways in

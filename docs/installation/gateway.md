@@ -251,7 +251,7 @@ The chart refuses to render rather than installing something unsafe:
 | `ssh.sourceIpAllowlist` empty | The Gateway's own default is allow-all with a warning. The check runs after `config.overrides` merges, so it cannot be stepped around by accident. |
 | `bootstrap.enabled` with no token, name or trust anchor | A Gateway with neither an identity nor a complete bootstrap block can never obtain one, and never says why. |
 | `terminationGracePeriodSeconds` at or below the drain budget | The kubelet would SIGKILL mid-drain and live sessions would lose their finalized recordings. |
-| `persistence.enabled` with more than one replica | Replicas would share one data directory. Each Gateway holds its own identity and generation counter, and a shared one reads to the Control Plane as a clone, which auto-locks it. |
+| `replicaCount` above 1 | One release deploys one Gateway. Every pod reads the same configuration, so they enroll with the same single-use token and all but the first crash-loop on `UNAUTHENTICATED`. With `persistence.enabled` they would instead share one data directory, and one identity used twice reads to the Control Plane as a clone, which auto-locks it. |
 | `podDisruptionBudget.minAvailable` not below `replicaCount` | Such a budget refuses every voluntary eviction and hangs a node drain. |
 
 Two values worth setting deliberately:
@@ -263,11 +263,22 @@ Two values worth setting deliberately:
 - `ssh.agent.advertiseUrl` empty derives the in-cluster Service address, which
   is right only when your nodes are in this cluster. A fleet outside it needs
   the address of the load balancer they can actually reach.
+- `service.externalTrafficPolicy` is `Local`, because `ssh.sourceIpAllowlist`
+  compares against the address that reaches the Gateway. Under Kubernetes'
+  `Cluster` policy, kube-proxy forwards to another node and rewrites the source
+  to a node address, and the allowlist then filters on that instead of on your
+  clients. The other way out is `ssh.proxy.lbCidrs`, which turns on PROXY
+  protocol v2: name your load balancer's ranges there, enable the header on it,
+  and the Gateway reads the client address out of that header. Both directions
+  fail closed, so a connection from those ranges without a header is dropped,
+  and so is one from anywhere else.
 
-For multiple replicas serving agent-based nodes, `ha.coordination` must move
-off `in_process`: it cannot reach another pod, so a session landing on a
-Gateway that does not own the node's agent channel has no way to signal the
-one that does. See [High availability](../admin-guides/high-availability.md).
+A second Gateway is a second release, with its own name, its own enrollment
+token and its own values file. For a fleet serving agent-based nodes,
+`ha.coordination` must move off `in_process`: it reaches no other process, so a
+session landing on a Gateway that does not own the node's agent channel has no
+way to signal the one that does. See
+[High availability](../admin-guides/high-availability.md).
 
 The plain manifests remain the non-Helm reference. Apply
 `deploy/kubernetes/networkpolicy.yaml` and `deploy/kubernetes/gateway.yaml`,

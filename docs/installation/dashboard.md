@@ -147,9 +147,17 @@ Secret beyond `imagePullSecrets`, because the bundle holds no credential:
 ```bash
 helm install dashboard deploy/helm/sessionlayer-dashboard \
   --namespace sessionlayer \
+  --set image.repository=registry.example.com/sessionlayer/dashboard \
   --set image.digest="$DIGEST" \
   --set 'csp.connectSrc={https://cp.example.com,https://idp.example.com,https://s3.example.com}'
 ```
+
+Replace `registry.example.com/sessionlayer/dashboard` with the image you built
+above, and `$DIGEST` with its digest. The chart refuses to render while
+`image.repository` is the published one, because that bundle calls
+`http://localhost:8080` and no value moves it. To look at the published image
+anyway, add `--set image.allowUnconfiguredBuild=true` and reach the Control
+Plane through `kubectl port-forward` on port 8080.
 
 `csp.connectSrc` is the header value discussed above, and empty collapses
 `connect-src` to `'self'`. That is the fail-closed direction: a single-origin
