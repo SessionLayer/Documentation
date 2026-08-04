@@ -37,7 +37,11 @@ docker pull ghcr.io/sessionlayer/controlplane:v0.0.2
 ```
 
 `v0.0.2` is the release tag; substitute the one you are installing. There is no
-`:latest`. The image is a `linux/amd64` + `linux/arm64` index.
+`:latest`. The image is a `linux/amd64` + `linux/arm64` index carrying a
+jlink'd Java 25 runtime on a distroless base, so there is no shell, no package
+manager and no JDK tooling in it. `USER` is a numeric 10000, which is what lets
+Kubernetes `runAsNonRoot` enforce it without an `/etc/passwd` lookup, and `/tmp`
+is the only path the process writes.
 
 Verify it before you run it. The signature and the provenance sit in the
 registry beside the image, so this needs nothing downloaded first:
@@ -180,6 +184,12 @@ built-in `9090`. Drop it and the published `9443` reaches nothing.
 > native epoll transport from unpacking its library there; the process still
 > starts (it falls back to NIO with a log warning), but pass `exec` to keep
 > the native transport available.
+
+The image bakes in no `JAVA_TOOL_OPTIONS`, because heap and GC belong to
+whatever knows the memory limit. Wherever you set one, set the heap with it:
+`-e JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0` alongside a `--memory` cap.
+The JVM's own default of 25% undersizes the heap for a WebFlux, gRPC and R2DBC
+workload; the chart's `java.toolOptions` does this for you.
 
 ### Kubernetes, with Helm
 
