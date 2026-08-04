@@ -352,6 +352,13 @@ release workflow via `RUSTFLAGS`; SBOM timestamps/serial numbers are
 normalized. Skip any of these preconditions, and an independent rebuild
 differs in exactly that input.
 
+The gate covers artifacts, not images. Nothing rebuilds an image digest twice
+and compares, so an image is signed and attested but not reproducible in this
+sense. The JDK pin is narrower than it reads, too: it fixes the JDK that
+compiles the Control Plane jar and says nothing about the JVM the Control Plane
+image ships. Should the two turn out to be the same build, that is a fact about
+how the image happens to be assembled, not a property anything checks.
+
 > **Warning:** the base image is a real precondition, not a formality, and
 > it is the one most easily missed — the remap rules address *paths*, and
 > nothing in `RUSTFLAGS` normalizes the host C toolchain. Rebuilding the
