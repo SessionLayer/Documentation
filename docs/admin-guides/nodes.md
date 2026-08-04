@@ -159,8 +159,10 @@ used.
 > **Warning:** skipping this step does not fail loudly. An Agent joining a
 > name that does not exist creates the node itself, with no anchor, and every
 > session to it then aborts at host verification. The anchor is written at
-> registration and only there, so the repair is to register a replacement node
-> under a new name and restart the Agent with `--node-name` pointing at it.
+> registration and only there, and removing the node does not release its
+> name: removal is a soft delete, the name stays reserved, and re-registering
+> it returns `409`. The repair is to register a replacement node under a new
+> name and restart the Agent with `--node-name` pointing at it.
 
 ### 2. Issue a join token
 
@@ -306,6 +308,10 @@ and, for an agent node, revokes the agent credential: the identity is
 deactivated and a covering lock is pushed, so a stale copy of the credential
 cannot renew and re-joining cannot bypass the revocation. Re-enrolling the
 host later means issuing a fresh join token.
+
+Removal is a soft delete: the row survives with `status: removed` so its
+history stays attributable, which means the node keeps its name. Registering
+that name again returns `409`. Bring the host back under a new node name.
 
 ## Node lifecycle at a glance
 
