@@ -16,11 +16,9 @@ No chart repository is published. Install from a checkout of the component's
 repository at the tag you are deploying, or run `helm package` on it and host
 the tarball wherever your cluster's tooling reads charts from.
 
-> **Warning:** these charts are validated statically only: `helm lint`,
-> `helm template`, each chart's `values.schema.json`, and `kubeconform
-> -strict` against the Kubernetes API schemas. No chart has been installed
-> into a live cluster as part of this project's testing, so a first install
-> is yours to validate. The plain manifests under each repository's
+> **Warning:** these charts are validated statically only. No chart has been
+> installed into a live cluster as part of this project's testing, so a first
+> install is yours to validate. The plain manifests under each repository's
 > `deploy/kubernetes/` have the same status and remain the reference for a
 > deployment that does not use Helm.
 
@@ -167,6 +165,22 @@ Summary: 6 resources found parsing stdin - Valid: 6, Invalid: 0, Errors: 0, Skip
 Each chart's `ci/` directory holds the values file it is linted and
 schema-checked against, with every optional path switched on. Start from it
 when you want to see what a fully-configured render looks like.
+
+Those two commands are the ones CI runs. Every repository's `ci.yml` carries a
+`chart` job, on every push and every pull request, alongside the build gate and
+the image job. It lints each chart, renders every values file in `ci/`, and
+schema-checks the output with `kubeconform -strict`. helm, kubeconform and the
+Kubernetes API version are all pinned, the last of those because the schemas are
+fetched per run and an unpinned version moves what a green check means. The job
+reads kubeconform's JSON summary rather than its exit code, which is `0` over an
+empty file and reports a schema it could not find as skipped rather than as
+failed.
+
+The half of that job with teeth asserts the charts refuse what they must refuse.
+Everything above would still pass if every `required` in a chart were deleted,
+so the job also renders with each secret reference removed and demands a failure
+naming it. That is the property this page describes, checked rather than
+asserted.
 
 ## See also
 
