@@ -289,7 +289,7 @@ surface:
 $ gateway health
 {
   "component": "SessionLayer Gateway",
-  "semver": "0.0.1",
+  "semver": "0.0.2",
   "protocol_range": "1.0-1.1",
   "status": "ok"
 }

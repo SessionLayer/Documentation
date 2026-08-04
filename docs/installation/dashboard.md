@@ -49,7 +49,7 @@ header set is the contract, any server that emits it is fine.
 | Asset | Use it when |
 |---|---|
 | `deploy/nginx.conf` + `deploy/security-headers.conf` | you run your own TLS-terminating reverse proxy; replace the three `__CP_ORIGIN__` / `__OIDC_ORIGIN__` / `__OBJECT_STORE_ORIGIN__` placeholders in `security-headers.conf` yourself |
-| `deploy/Dockerfile` | you want a container: builds `dist/`, serves via nginx, and fills those same placeholders from `SL_CSP_CONNECT_SRC` automatically at container start |
+| `deploy/Dockerfile` | you want a container: builds `dist/`, serves via nginx, and renders those same placeholders from `SL_CSP_CONNECT_SRC` at container start, onto a tmpfs rather than back into `/etc/nginx`, so a read-only root filesystem holds |
 | `deploy/_headers` | a static host (Netlify / Cloudflare Pages): the header set uses `REPLACE-*` tokens that your deploy pipeline must substitute before publishing, since these hosts cannot template from an environment at request time |
 
 The set includes a strict CSP (`script-src 'self'`, no inline anything), HSTS
@@ -67,20 +67,6 @@ directly and sits outside what CSP's `style-src` governs. `e2e/csp.spec.ts`
 loads the authenticated app under this exact policy and asserts zero
 violations.
 
-Container example:
-
-```bash
-docker build -f deploy/Dockerfile \
-  --build-arg VITE_CP_BASE_URL=https://cp.example.com \
-  --build-arg VITE_OIDC_ISSUER=https://idp.example.com \
-  --build-arg VITE_OIDC_CLIENT_ID=sessionlayer-dashboard \
-  -t sessionlayer-dashboard .
-
-docker run -d -p 8443:8080 \
-  -e SL_CSP_CONNECT_SRC="https://cp.example.com https://idp.example.com https://s3.example.com" \
-  sessionlayer-dashboard
-```
-
 > **Warning:** `connect-src` must list all three origins: the Control Plane,
 > the OIDC token endpoint, and the object store. Omit one and the matching flow
 > breaks: data loads, login, or recording replay respectively. Unset
@@ -88,6 +74,113 @@ docker run -d -p 8443:8080 \
 > the still-encrypted object directly from the signed URL, never through the
 > API, which is exactly why the object-store origin appears here and why no
 > bearer token ever reaches the object store.
+
+## Run the published image
+
+```bash
+docker pull ghcr.io/sessionlayer/dashboard:v0.0.2
+```
+
+`v0.0.2` is the release tag; substitute the one you are installing. There is no
+`:latest`. The image is a `linux/amd64` + `linux/arm64` index serving `dist/`
+behind unprivileged nginx, on port 8080 as a numeric uid 101, with `/tmp` its
+only writable path.
+
+> **Warning:** the published image is an evaluation artifact and cannot be
+> repointed. Vite inlines the endpoints into the bundle at build time, and the
+> release build passes no `VITE_*` values, so that image talks to
+> `http://localhost:8080` and to no identity provider. Nothing you set at
+> runtime changes it: there is no environment variable, no config file, and no
+> mount that moves those endpoints once the bundle is built.
+
+Building your own image, with your own endpoints, is the supported path for
+every real deployment:
+
+```bash
+docker build -f deploy/Dockerfile \
+  --build-arg VITE_CP_BASE_URL=https://cp.example.com \
+  --build-arg VITE_OIDC_ISSUER=https://idp.example.com \
+  --build-arg VITE_OIDC_CLIENT_ID=sessionlayer-dashboard \
+  -t sessionlayer-dashboard .
+```
+
+Push that to a registry your cluster pulls from and deploy it by digest, the
+same way you would the published one. Runtime configuration, where the
+container reads its endpoints from the environment at start instead, does not
+exist yet.
+
+`SL_CSP_CONNECT_SRC` is the one value that is genuinely runtime: it is
+substituted into the served response headers at container start, so it belongs
+to the deployment rather than to the build.
+
+Verify it before you run it:
+
+```bash
+DIGEST=$(docker buildx imagetools inspect ghcr.io/sessionlayer/dashboard:v0.0.2 \
+  --format '{{json .Manifest}}' | jq -r .digest)
+
+cosign verify "ghcr.io/sessionlayer/dashboard@$DIGEST" \
+  --certificate-identity "https://github.com/SessionLayer/Dashboard/.github/workflows/release.yml@refs/tags/v0.0.2" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+
+gh attestation verify "oci://ghcr.io/sessionlayer/dashboard@$DIGEST" \
+  --repo SessionLayer/Dashboard
+```
+
+```bash
+docker run -d -p 8443:8080 \
+  --read-only --tmpfs /tmp \
+  -e SL_CSP_CONNECT_SRC="https://cp.example.com https://idp.example.com https://s3.example.com" \
+  "ghcr.io/sessionlayer/dashboard@$DIGEST"
+```
+
+Deploy `$DIGEST`, not the tag, whether it is the published image or your own
+pushed to your own registry. [Supply chain](../security/supply-chain.md) covers
+reading the image's SBOM and the rest of the release evidence.
+
+## Deploy on Kubernetes
+
+`deploy/helm/sessionlayer-dashboard` renders a Deployment, a Service, a
+ServiceAccount, a PodDisruptionBudget and a NetworkPolicy. It references no
+Secret beyond `imagePullSecrets`, because the bundle holds no credential:
+
+```bash
+helm install dashboard deploy/helm/sessionlayer-dashboard \
+  --namespace sessionlayer \
+  --set image.repository=registry.example.com/sessionlayer/dashboard \
+  --set image.digest="$DIGEST" \
+  --set 'csp.connectSrc={https://cp.example.com,https://idp.example.com,https://s3.example.com}'
+```
+
+Replace `registry.example.com/sessionlayer/dashboard` with the image you built
+above, and `$DIGEST` with its digest. The chart refuses to render while
+`image.repository` is the published one, because that bundle calls
+`http://localhost:8080` and no value moves it. To look at the published image
+anyway, add `--set image.allowUnconfiguredBuild=true` and reach the Control
+Plane through `kubectl port-forward` on port 8080.
+
+`csp.connectSrc` is the header value discussed above, and empty collapses
+`connect-src` to `'self'`. That is the fail-closed direction: a single-origin
+deployment behind one reverse proxy needs nothing here, and every other
+deployment gets a visible failure rather than a quiet widening.
+
+`image.digest` carries more weight here than for the other three components.
+The Control Plane URL and the identity provider are compiled into the bundle,
+so the tag alone does not say which deployment an image belongs to.
+
+The chart's NetworkPolicy allows egress to cluster DNS and nothing else, since
+the browser fetches the API, the identity provider and the object store
+directly. Ingress on the container port is open to the whole cluster by
+default, which is what an ingress controller in an arbitrary namespace needs.
+Narrow it with `networkPolicy.ingressFromPodSelector` and
+`networkPolicy.ingressFromNamespaceSelector` once you know your controller's
+labels.
+
+TLS is terminated in front of the pod. The image sends HSTS on every response
+and the OIDC flow refuses a cleartext endpoint, so a plain-HTTP ingress in
+front of it is a broken deployment, not a relaxed one.
+[Deploy with Helm](helm.md) covers what all four charts have in common, and the
+static-validation-only status they ship with.
 
 ## Log in
 

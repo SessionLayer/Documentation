@@ -105,8 +105,8 @@ curl -s https://cp.example.com/v1/nodes \
 ```
 
 > **Warning:** registration without a `hostCertificate` or `pinnedHostKey` is
-> rejected. There is no way to enroll a node "and trust whatever key it shows
-> up with later." That would be trust-on-first-use, and a network attacker
+> rejected, for either connector kind. There is no way to enroll a node "and
+> trust whatever key it shows up with later." That would be trust-on-first-use, and a network attacker
 > in the Gateway→node path could then impersonate the node. If the node is
 > ever re-keyed, update its anchor before the old one stops matching, or
 > sessions to it will (correctly) abort.
@@ -121,11 +121,53 @@ the `/v1/operator-settings` fields.
 
 ## Enroll an agent node
 
-An agent node is not registered by address; the Agent introduces it when it
-joins. Three join methods exist. The everyday one is a
-[join token](../getting-started/concepts.md).
+Register the node, issue a join token, then start the Agent on the host.
+Registration comes first: it is where the node's host-identity anchor is set,
+and nothing adds one later.
 
-### 1. Issue a join token
+### 1. Register the node
+
+An agent node carries no dial address. The Gateway reaches it through the
+Agent's outbound channel, so a registration that supplies an address is
+rejected.
+
+```bash
+curl -s https://cp.example.com/v1/nodes \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "web-02",
+    "connectorKind": "agent",
+    "labels": { "env": "prod", "role": "web" },
+    "pinnedHostKey": "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBExampleOnlyNotARealKey= root@web-02"
+  }'
+```
+
+`connectorKind` defaults to `agentless`, so a request that omits it registers
+a node the Gateway will try to dial.
+
+The host anchor is required here for the same reason an agentless node needs
+one. The Gateway runs the same host-identity verification on the inner SSH
+leg whichever connector reached the node, and aborts the session when it has
+nothing to verify against.
+
+A join is refused if the name is already registered as `agentless`. The two
+models are not interchangeable after enrollment: the Control Plane would hand
+the Gateway a dial address while the Agent held a control channel nobody
+used.
+
+> **Warning:** skipping this step does not fail loudly. An Agent joining a
+> name that does not exist creates the node itself, with no anchor, and every
+> session to it then aborts at host verification. The anchor is written at
+> registration and only there, and removing the node does not release its
+> name: removal is a soft delete, the name stays reserved, and re-registering
+> it returns `409`. The repair is to register a replacement node under a new
+> name and restart the Agent with `--node-name` pointing at it.
+
+### 2. Issue a join token
+
+The everyday join method is a [join token](../getting-started/concepts.md).
+The two alternatives appear in step 3.
 
 ```bash
 curl -s https://cp.example.com/v1/join-tokens \
@@ -140,7 +182,7 @@ single-use, short-lived, and scoped to exactly the node name you gave it.
 Because issuance is a plain API call, an autoscaler or config-management run
 can provision tokens without a human.
 
-### 2. Install and run the Agent
+### 3. Install and run the Agent
 
 Install the `sessionlayer-agent` binary
 ([verify the release signature first](../security/supply-chain.md)), then
@@ -171,8 +213,9 @@ which is a working default only for a Gateway enrolled under that name.
 > dedicated user (the container image runs as uid 65532).
 
 On first contact the Agent exchanges the token for a renewable mTLS identity
-with a generation counter, persists it in its data directory, and registers
-the node. From then on it renews ahead of expiry on its own. If a credential
+with a generation counter, persists it in its data directory, and attaches to
+the node you registered in step 1. From then on it renews ahead of expiry on
+its own. If a credential
 is ever cloned, the generation counter forks and the Control Plane
 auto-locks both copies. See [Locks](locks.md).
 
@@ -188,7 +231,7 @@ Whatever the bootstrap method, the ongoing credential is always the same
 renewable mTLS identity, and revocation is always a lock plus the generation
 counter. No join method is a standing bypass.
 
-### 3. Outbound dial-back, and HA
+### 4. Outbound dial-back, and HA
 
 `--gateway-endpoint` is the outbound dial-out; the node needs zero inbound
 reachability. Sessions arrive as dial-back requests over that control
@@ -265,6 +308,10 @@ and, for an agent node, revokes the agent credential: the identity is
 deactivated and a covering lock is pushed, so a stale copy of the credential
 cannot renew and re-joining cannot bypass the revocation. Re-enrolling the
 host later means issuing a fresh join token.
+
+Removal is a soft delete: the row survives with `status: removed` so its
+history stays attributable, which means the node keeps its name. Registering
+that name again returns `409`. Bring the host back under a new node name.
 
 ## Node lifecycle at a glance
 

@@ -24,6 +24,27 @@ container security context then carries that layer.
 > hardened profile on your own arm hardware before production, as the sign-off
 > E2Es ran on x86_64.
 
+## Container images and charts
+
+| Component | Image | Chart |
+|---|---|---|
+| Control Plane | `ghcr.io/sessionlayer/controlplane` | `deploy/helm/sessionlayer-controlplane` |
+| Gateway | `ghcr.io/sessionlayer/gateway` | `deploy/helm/sessionlayer-gateway` |
+| Agent | `ghcr.io/sessionlayer/agent` | `deploy/helm/sessionlayer-agent` |
+| Dashboard | `ghcr.io/sessionlayer/dashboard` | `deploy/helm/sessionlayer-dashboard` |
+
+Each image is a `linux/amd64` + `linux/arm64` index carrying the release tag,
+signed and attested in the registry. Verifying one needs `cosign`, plus the
+GitHub CLI for the provenance and `docker buildx` for the SBOM
+([Supply chain](../security/supply-chain.md)).
+
+Each chart lives in its component's repository and declares
+`kubeVersion: >=1.21.0-0`, the floor for a `policy/v1` PodDisruptionBudget.
+Every chart renders a NetworkPolicy unless you turn it off, permitting only the
+peers its component talks to. That needs a CNI that enforces NetworkPolicy; on
+one that does not, the object is accepted and enforces nothing
+([Deploy with Helm](helm.md)).
+
 ## Backing services
 
 | Service | Version | Used for |

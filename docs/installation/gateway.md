@@ -16,7 +16,9 @@ Prerequisites:
 
 - [ ] a running [Control Plane](control-plane.md), reachable from the Gateway
       host on the mTLS gRPC port
-- [ ] the [Gateway](https://github.com/SessionLayer/Gateway) source checkout
+- [ ] a [Gateway](https://github.com/SessionLayer/Gateway) checkout at the tag
+      you are deploying, for the chart, the manifests and the systemd unit,
+      none of which are distributed separately
 - [ ] an admin bearer token holding `gateway:enroll`, for the one-time
       enrollment steps
 
@@ -26,23 +28,50 @@ Prerequisites:
 |---|---|---|
 | SSH port | high port (`:2222`), Service/LB maps `:22` to it | binds `:22` directly |
 | Privilege | starts non-root (uid 65532) | starts root, drops after bind |
-| Assets | `deploy/Dockerfile` + `deploy/kubernetes/gateway.yaml` | `deploy/systemd/sessionlayer-gateway.service` |
+| Assets | `deploy/helm/sessionlayer-gateway/`, or `deploy/kubernetes/gateway.yaml` | `deploy/systemd/sessionlayer-gateway.service` |
 | Filesystem | read-only rootfs + Landlock | `ProtectSystem=strict` + Landlock |
-| Egress control | `deploy/kubernetes/networkpolicy.yaml` | host firewall |
+| Egress control | the chart's `networkPolicy.*`, or `deploy/kubernetes/networkpolicy.yaml` | host firewall |
 
-`deploy/kubernetes/gateway.yaml` ships a Deployment, a ConfigMap, and a
-`LoadBalancer` Service mapping port `22` to the container's `2222`. Its
-readinessProbe polls the Gateway's own `GET /readyz` surface
-(`ha.drain.readyz_addr`), so the Service stops routing to a pod that is
+`deploy/kubernetes/gateway.yaml` ships a Secret holding `gateway.json`, a
+ConfigMap holding the Control Plane's CA certificate, a Deployment, a
+PodDisruptionBudget, and a `LoadBalancer` Service mapping port `22` to the
+container's `2222`. Its readinessProbe polls the Gateway's own `GET /readyz`
+surface (`ha.drain.readyz_addr`), so the Service stops routing to a pod that is
 unready or draining before the pod stops listening.
 
-Its `image: ghcr.io/sessionlayer/gateway:latest` line is a placeholder: no
-container image is published for any SessionLayer component. Build one with
-the command below, push it to a registry your cluster can pull from, and point
-the manifest at what you pushed, by digest for production. Applying the
-manifest unchanged leaves the pods in `ImagePullBackOff`.
+## Get the image
 
-Build the hardened image (or the bare binary):
+```bash
+docker pull ghcr.io/sessionlayer/gateway:v0.0.2
+```
+
+`v0.0.2` is the release tag; substitute the one you are installing. There is no
+`:latest`. The image is a `linux/amd64` + `linux/arm64` index, runs as uid
+65532 with no shell in the final layer, and writes only to
+`/var/lib/sessionlayer-gateway`, so it needs nothing beyond a
+`readOnlyRootFilesystem: true` pod and that one volume.
+
+Verify it before you run it. The signature and the provenance sit in the
+registry beside the image:
+
+```bash
+DIGEST=$(docker buildx imagetools inspect ghcr.io/sessionlayer/gateway:v0.0.2 \
+  --format '{{json .Manifest}}' | jq -r .digest)
+
+cosign verify "ghcr.io/sessionlayer/gateway@$DIGEST" \
+  --certificate-identity "https://github.com/SessionLayer/Gateway/.github/workflows/release.yml@refs/tags/v0.0.2" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+
+gh attestation verify "oci://ghcr.io/sessionlayer/gateway@$DIGEST" \
+  --repo SessionLayer/Gateway
+```
+
+Deploy `$DIGEST`, not the tag. A registry tag can be re-pushed to different
+bytes and the manifest that names it looks unchanged.
+[Supply chain](../security/supply-chain.md) covers reading the image's SBOM and
+the rest of the release evidence.
+
+Building from source stays supported, and then your build is your provenance:
 
 ```bash
 git clone https://github.com/SessionLayer/Gateway.git
@@ -54,8 +83,7 @@ docker build -f deploy/Dockerfile -t sessionlayer-gateway .
 
 > **Note:** building from a clone means you run whatever the checkout contains.
 > For anything beyond evaluation, build from a reviewed, pinned commit or tag,
-> not a moving branch. [Supply chain](../security/supply-chain.md) covers
-> verifying released artifacts.
+> not a moving branch.
 
 ## Write the config
 
@@ -167,10 +195,11 @@ Fill the real token into the config on the Gateway host, then start it:
 ```bash
 # container: the image's default command is --config /etc/sessionlayer/gateway.json
 docker run -d --name sessionlayer-gateway \
+  --read-only \
   -v /etc/sessionlayer:/etc/sessionlayer:ro \
   -v sessionlayer-gateway-data:/var/lib/sessionlayer-gateway \
   -p 2222:2222 -p 9444:9444 \
-  sessionlayer-gateway
+  "ghcr.io/sessionlayer/gateway@$DIGEST"
 
 # bare-metal / systemd
 sudo cp deploy/systemd/sessionlayer-gateway.service /etc/systemd/system/
@@ -186,6 +215,84 @@ nothing.
 > **Note:** if a Gateway is ever compromised, you do not chase its
 > certificate. [Lock it](../admin-guides/locks.md) instead. A locked Gateway
 > is refused renewal and new work immediately.
+
+## Deploy on Kubernetes
+
+`deploy/helm/sessionlayer-gateway` renders `gateway.json` into a Secret rather
+than a ConfigMap, because that file carries the enrollment token. Land the
+Control Plane's CA certificate as a ConfigMap first, then install.
+`$ENROLLMENT_TOKEN` is the token step 2 returned once, and `$DIGEST` the digest
+you verified above:
+
+```bash
+kubectl -n sessionlayer create configmap sessionlayer-bootstrap-ca \
+  --from-file=ca.pem=cp-mtls-ca.pem
+
+helm install gw deploy/helm/sessionlayer-gateway \
+  --namespace sessionlayer \
+  --set trustAnchor.existingConfigMap=sessionlayer-bootstrap-ca \
+  --set bootstrap.gatewayName=gw-1 \
+  --set bootstrap.enrollmentToken="$ENROLLMENT_TOKEN" \
+  --set 'ssh.sourceIpAllowlist={10.0.0.0/8}' \
+  --set image.digest="$DIGEST"
+```
+
+To keep the token out of a values file and out of Helm's release storage
+entirely, put the whole `gateway.json` in a Secret you create yourself and set
+`config.existingSecret` to its name. The chart then renders no configuration of
+its own, and `ssh.listenPort`, `ssh.agent.listenPort` and `ha.drain.readyzPort`
+become yours to keep in step with what the file says, since the chart cannot
+read it.
+
+The chart refuses to render rather than installing something unsafe:
+
+| Condition | Why it refuses |
+|---|---|
+| `ssh.sourceIpAllowlist` empty | The Gateway's own default is allow-all with a warning. The check runs after `config.overrides` merges, so it cannot be stepped around by accident. |
+| `bootstrap.enabled` with no token, name or trust anchor | A Gateway with neither an identity nor a complete bootstrap block can never obtain one, and never says why. |
+| `terminationGracePeriodSeconds` at or below the drain budget | The kubelet would SIGKILL mid-drain and live sessions would lose their finalized recordings. |
+| `replicaCount` above 1 | One release deploys one Gateway. Every pod reads the same configuration, so they enroll with the same single-use token and all but the first crash-loop on `UNAUTHENTICATED`. With `persistence.enabled` they would instead share one data directory, and one identity used twice reads to the Control Plane as a clone, which auto-locks it. |
+| `podDisruptionBudget.minAvailable` not below `replicaCount` | Such a budget refuses every voluntary eviction and hangs a node drain. |
+
+Two values worth setting deliberately:
+
+- `persistence.enabled` is `false`, so a restart re-enrolls and needs a fresh
+  single-use token every time. Turn it on for anything but evaluation. A claim
+  the chart creates carries `helm.sh/resource-policy: keep`, because the
+  enrolled identity outlives the release.
+- `ssh.agent.advertiseUrl` empty derives the in-cluster Service address, which
+  is right only when your nodes are in this cluster. A fleet outside it needs
+  the address of the load balancer they can actually reach.
+- `service.externalTrafficPolicy` is `Local`, because `ssh.sourceIpAllowlist`
+  compares against the address that reaches the Gateway. Under Kubernetes'
+  `Cluster` policy, kube-proxy forwards to another node and rewrites the source
+  to a node address, and the allowlist then filters on that instead of on your
+  clients. The other way out is `ssh.proxy.lbCidrs`, which turns on PROXY
+  protocol v2: name your load balancer's ranges there, enable the header on it,
+  and the Gateway reads the client address out of that header. Both directions
+  fail closed, so a connection from those ranges without a header is dropped,
+  and so is one from anywhere else.
+
+A second Gateway is a second release, with its own name, its own enrollment
+token and its own values file. For a fleet serving agent-based nodes,
+`ha.coordination` must move off `in_process`: it reaches no other process, so a
+session landing on a Gateway that does not own the node's agent channel has no
+way to signal the one that does. See
+[High availability](../admin-guides/high-availability.md).
+
+The plain manifests remain the non-Helm reference. Apply
+`deploy/kubernetes/networkpolicy.yaml` and `deploy/kubernetes/gateway.yaml`,
+replacing the manifest's `image:` tag with the digest you verified.
+
+> **Warning:** `gateway.yaml` carries `gateway.json` in a Secret, with
+> `REPLACE_WITH_ENROLLMENT_TOKEN` where the token goes. Filling that in writes a
+> live credential into a file on your disk, so edit a copy outside the
+> repository and delete it once the Gateway has enrolled. The token is
+> single-use, so what a stray copy holds afterwards is spent rather than
+> standing.
+
+[Deploy with Helm](helm.md) covers what all four charts have in common, and the
+static-validation-only status they ship with.
 
 ## Turn on the hardened profile
 
