@@ -370,6 +370,11 @@ CIDRs to your fleet:
 kubectl apply -f Gateway/deploy/kubernetes/networkpolicy.yaml
 ```
 
+The Gateway chart renders the same policy, on by default, from
+`networkPolicy.nodeCidrs` and `networkPolicy.wormCidrs`. Both start empty, so
+agentless sessions and recording uploads are denied until you name the ranges.
+The install notes print which of the two is currently denied.
+
 On bare metal, use the shipped systemd unit (OS sandbox directives and
 capability bounding) and express the same egress set in nftables. The
 deployment reference, including the container securityContext, lives in the
