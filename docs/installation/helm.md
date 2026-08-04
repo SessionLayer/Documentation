@@ -75,11 +75,17 @@ tag resolves to the chart's `appVersion`, which is the component release the
 chart was published for. A digest wins over a tag whenever both are set:
 
 ```bash
+DIGEST=$(docker buildx imagetools inspect ghcr.io/sessionlayer/controlplane:v0.0.2 \
+  --format '{{json .Manifest}}' | jq -r .digest)
+
 helm upgrade --install cp deploy/helm/sessionlayer-controlplane \
   --namespace sessionlayer --create-namespace \
-  --set image.digest=sha256:<the digest cosign verified> \
+  --set image.digest="$DIGEST" \
   --set secrets.existingSecret=sessionlayer-controlplane-secrets \
-  ...
+  --set recording.worm.endpoint=https://worm.example.com \
+  --set oidc.issuer=https://idp.example.com \
+  --set oidc.clientId=sessionlayer-controlplane \
+  --set oidc.redirectUri=https://cp.example.com/v1/auth/callback
 ```
 
 Verify the digest before you pin it. [Supply chain](../security/supply-chain.md)
