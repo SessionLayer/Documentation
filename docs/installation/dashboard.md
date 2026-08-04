@@ -49,7 +49,7 @@ header set is the contract, any server that emits it is fine.
 | Asset | Use it when |
 |---|---|
 | `deploy/nginx.conf` + `deploy/security-headers.conf` | you run your own TLS-terminating reverse proxy; replace the three `__CP_ORIGIN__` / `__OIDC_ORIGIN__` / `__OBJECT_STORE_ORIGIN__` placeholders in `security-headers.conf` yourself |
-| `deploy/Dockerfile` | you want a container: builds `dist/`, serves via nginx, and fills those same placeholders from `SL_CSP_CONNECT_SRC` automatically at container start |
+| `deploy/Dockerfile` | you want a container: builds `dist/`, serves via nginx, and renders those same placeholders from `SL_CSP_CONNECT_SRC` at container start, onto a tmpfs rather than back into `/etc/nginx`, so a read-only root filesystem holds |
 | `deploy/_headers` | a static host (Netlify / Cloudflare Pages): the header set uses `REPLACE-*` tokens that your deploy pipeline must substitute before publishing, since these hosts cannot template from an environment at request time |
 
 The set includes a strict CSP (`script-src 'self'`, no inline anything), HSTS
@@ -82,8 +82,9 @@ docker pull ghcr.io/sessionlayer/dashboard:v0.0.2
 ```
 
 `v0.0.2` is the release tag; substitute the one you are installing. There is no
-`:latest`. The image is a `linux/amd64` + `linux/arm64` index, serving `dist/`
-behind unprivileged nginx on port 8080 as uid 101.
+`:latest`. The image is a `linux/amd64` + `linux/arm64` index serving `dist/`
+behind unprivileged nginx, on port 8080 as a numeric uid 101, with `/tmp` its
+only writable path.
 
 > **Warning:** the endpoints are compiled into the bundle, and the release
 > build passes no `VITE_*` values, so the published image talks to
@@ -117,6 +118,7 @@ gh attestation verify "oci://ghcr.io/sessionlayer/dashboard@$DIGEST" \
 
 ```bash
 docker run -d -p 8443:8080 \
+  --read-only --tmpfs /tmp \
   -e SL_CSP_CONNECT_SRC="https://cp.example.com https://idp.example.com https://s3.example.com" \
   "ghcr.io/sessionlayer/dashboard@$DIGEST"
 ```
