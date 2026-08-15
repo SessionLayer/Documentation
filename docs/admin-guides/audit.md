@@ -21,10 +21,10 @@ dimensions cover everything an investigation pivots on: identity, target,
 node and node label, session, source IP, capability, access model, and time:
 
 ```bash
-# Everything alice did on prod web nodes last week:
+# Every authorization decision about alice on prod web nodes last week:
 curl -s -G https://cp.example.com/v1/audit-events \
   -H "Authorization: Bearer $TOKEN" \
-  --data-urlencode "actor=alice@example.com" \
+  --data-urlencode "subject=alice@example.com" \
   --data-urlencode "nodeLabel=env=prod" \
   --data-urlencode "nodeLabel=role=web" \
   --data-urlencode "from=2026-07-13T00:00:00Z" \
@@ -41,6 +41,28 @@ curl -s -G https://cp.example.com/v1/audit-events \
   -H "Authorization: Bearer $TOKEN" \
   --data-urlencode "action=lock.create"
 ```
+
+### `actor` and `subject` are not the same person
+
+`actor` is who made the call. `subject` is who it was about. A session splits
+across both, because the Gateway acts on the user's behalf: `authz.decision`
+and `session.end` carry the Gateway's enrolled identity as `actor` and the
+human as `subject`, while `recording.begin`/`upload`/`finalize` and the
+`sftp.*` operations carry the human as `actor` and no subject.
+
+One session by `alice@example.com`, filtered each way:
+
+| Filter | What comes back |
+|---|---|
+| `subject=alice@example.com` | `authz.decision`, `session.end`, `otp.issue`, `pin.create` |
+| `actor=alice@example.com` | `pin.resolve`, `recording.begin`, `recording.upload`, `recording.finalize`, `sftp.read`, `sftp.write` |
+
+The two sets do not overlap, so neither filter alone answers "everything alice
+did". Use `subject` for "what was decided about this person", `actor` for "what
+this person or component performed", and `correlationId` (below) when you want
+one session whole. Both filters match exactly and neither is validated, so a
+wrong guess returns an empty page rather than an error, which reads exactly like
+an event that was never recorded.
 
 The `authz.decision` events in this stream are what other pages call the
 decision log: the operator-side truth behind every generic
