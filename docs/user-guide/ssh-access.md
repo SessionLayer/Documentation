@@ -50,7 +50,7 @@ Typing the encoding every time gets old, so give each node a
 `~/.ssh/config` block. After this, plain `ssh web-01` works:
 
 ```bash
-docker compose exec -T client sh -c 'mkdir -p /root/.ssh && cat >> /root/.ssh/config <<EOF
+docker compose exec -T client sh -c 'cat >> /root/.ssh/config <<EOF
 Host web-01
   HostName gateway
   Port 2222
@@ -59,6 +59,18 @@ Host web-01
 EOF'
 docker compose exec -T client ssh web-01 'hostname'
 ```
+
+```text
+web-01
+```
+
+> **Note:** on your own machine, `~/.ssh` must be `0700` and `~/.ssh/config`
+> `0600` or `ssh` refuses to read it (`Bad owner or permissions on
+> /root/.ssh/config`) and every connection fails. The client container ships
+> both at those modes already, which is why the block above only appends. A
+> shell redirection that *creates* the file gives it whatever your `umask`
+> allows, so run `chmod 700 ~/.ssh && chmod 600 ~/.ssh/config` after writing
+> one for the first time.
 
 > **Note:** inside `~/.ssh/config`, `%` is OpenSSH's expansion character, so
 > the `User` value writes the separator as `%%` (a literal `deploy%web-01`).
@@ -87,7 +99,7 @@ No first-use prompt, no leap of faith:
 
 ```bash
 GW_HOSTKEY=$(docker compose run --rm -T --entrypoint sh seed -c 'ssh-keygen -y -f /gw-data/ssh_host_key' 2>/dev/null)
-docker compose exec -T client sh -c "mkdir -p /root/.ssh && echo '[gateway]:2222 $GW_HOSTKEY' > /root/.ssh/known_hosts_gw"
+docker compose exec -T client sh -c "echo '[gateway]:2222 $GW_HOSTKEY' > /root/.ssh/known_hosts_gw"
 docker compose exec -T client ssh -p 2222 -o UserKnownHostsFile=/root/.ssh/known_hosts_gw \
   -o StrictHostKeyChecking=yes deploy%web-01@gateway 'echo verified, no TOFU'
 ```

@@ -164,7 +164,7 @@ A pin is an authentication shortcut with a TTL, the same thing the platform
 creates automatically after an OTP or device-flow login:
 
 ```bash
-docker compose exec -T client sh -c 'mkdir -p /root/.ssh && ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519 -q'
+docker compose exec -T client sh -c 'ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519 -q'
 FP=$(docker compose exec -T client ssh-keygen -lf /root/.ssh/id_ed25519.pub | awk '{print $2}')
 curl -s -X POST http://127.0.0.1:8080/v1/pins \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
