@@ -23,9 +23,8 @@ on the quickstart stack.
 > address for `gateway`, its SSH port for `2222`, and your Control Plane URL
 > for `http://127.0.0.1:8080`. The commands are otherwise identical, because
 > the client is stock OpenSSH either way.
-
-
-> **Note:** the `accept-new` in these evaluation blocks is fine against the
+>
+> The `accept-new` in those blocks is fine against the
 > throwaway loopback stack; production clients pre-provision the Gateway's
 > host key instead. See [SSH access](ssh-access.md).
 

@@ -23,7 +23,6 @@ access is refused.
 > for `http://127.0.0.1:8080`. The commands are otherwise identical, because
 > the client is stock OpenSSH either way.
 
-
 ## How addressing works
 
 The Gateway is a single SSH front door for the whole fleet, and stock `ssh`
@@ -81,8 +80,8 @@ web-01
 > shell redirection that *creates* the file gives it whatever your `umask`
 > allows, so run `chmod 700 ~/.ssh && chmod 600 ~/.ssh/config` after writing
 > one for the first time.
-
-> **Note:** inside `~/.ssh/config`, `%` is OpenSSH's expansion character, so
+>
+> Inside `~/.ssh/config`, `%` is OpenSSH's expansion character, so
 > the `User` value writes the separator as `%%` (a literal `deploy%web-01`).
 > There is no way to derive that from the hostname instead: `User` does not
 > expand `%h`/`%r` (you'll hit `vdollar_percent_expand: unknown key` if you

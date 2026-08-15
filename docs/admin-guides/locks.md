@@ -44,6 +44,27 @@ standard generic "access denied by policy". The reason is operator-facing
 only. The locked user is never told a lock exists, because a lock denial must
 be indistinguishable from any other denial.
 
+Confirm it landed before you rely on it (`lock:read`):
+
+```bash
+curl -s https://cp.example.com/v1/locks -H "Authorization: Bearer $TOKEN" \
+  | jq '.locks[] | {id, reason, mode, createdBy}'
+```
+
+```json
+{
+  "id": "01a0070a-751d-74a0-ba4d-77fff51c8ba0",
+  "reason": "credential suspected stolen, IR-1234",
+  "mode": "strict",
+  "createdBy": "platform-admin-bot"
+}
+```
+
+Note the envelope key is `locks`, not `items`. `POST /v1/locks` takes no
+`Idempotency-Key` in the examples here, so re-running one of these blocks
+creates a second lock rather than returning the first; that is harmless, since
+locks are OR-matched, but tidy them up afterwards.
+
 ## Lock targets
 
 A target is one or more facets, OR-matched: a session or issuance matching
