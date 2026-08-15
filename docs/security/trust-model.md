@@ -341,8 +341,8 @@ and the nine load-bearing invariants each carry a break-it test that
 fails if the invariant is removed: deny-fails-closed, lock supremacy, no
 self-approval, inner-key custody, customer-key unreadability, no-TOFU,
 single-use tokens, clone detection, verify-before-run. Two requirements are
-gaps rather than proofs, both the GitOps reconciler, which was descoped by
-decision and is not built or documented as available.
+gaps rather than proofs, both concerning the GitOps reconciler, which was
+descoped by decision and is not built or documented as available.
 
 > **Note:** treat the summary above as a statement of intent you should
 > verify rather than as evidence you can audit from this repository alone.
