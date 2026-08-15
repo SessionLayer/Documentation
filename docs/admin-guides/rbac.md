@@ -45,7 +45,9 @@ curl -s https://cp.example.com/v1/rules \
 Anyone in the IdP group `developers` may now SSH to any node labeled
 `env=staging`, as the Linux user `deploy`, with shell, exec, and SFTP. Invalid
 config is rejected with a `422` before anything is stored: empty principals, a
-non-positive TTL, an unknown capability, or a malformed selector.
+non-positive TTL, an unknown capability, or a malformed selector. `ttlSeconds`
+is required on an `allow` and has no default, so omitting it is a `422` naming
+the field: an unbounded grant is never inferred from silence.
 
 > **Note:** a rule's `ttlSeconds` is a request, not the final answer. It is one
 > of three terms in the grant expiry, alongside the cluster grant ceiling
@@ -152,14 +154,19 @@ curl -s https://cp.example.com/v1/rules \
     "identitySelector": { "groups": ["contractors"] },
     "nodeLabelSelector": { "env": { "op": "eq", "value": "prod" } },
     "principals": ["deploy"],
-    "ttlSeconds": 1,
     "effect": "deny"
   }'
 ```
 
-`ttlSeconds` is required on every rule, including a deny, and is `1` above
-because a deny has no grant to time-box: nothing reads it. Omitting it is a
-`400` whose body names no field, so send the minimum and move on.
+Note the absent `ttlSeconds`. A deny grants nothing, so it has no lifetime to
+bound and the evaluator reads a TTL only from allows; a deny is in force until
+you change the rule. The field is required, with no default, only on an
+`allow`, where omitting it is a `422` naming the field.
+
+"Ignored" is not "discarded". A `ttlSeconds` you send on a deny is stored and
+comes back on every read, so a rule that carries one is not malformed and does
+not need correcting. A value that is present is validated whatever the effect,
+so `"ttlSeconds": 0` on a deny is a `422` rather than a stored zero.
 
 A contractor who is also in `developers` and covered by ten allow rules is
 still denied on every `env=prod` node: one matching deny beats all allows,
@@ -295,7 +302,7 @@ curl -s https://cp.example.com/v1/role-bindings \
 ```
 
 The permission vocabulary is closed, and anything outside it is a `422`. The
-twenty names are listed in the
+twenty-one names are listed in the
 [API reference](../reference/api.md#closed-vocabularies).
 
 Two of them are not implied by any other and are easy to miss when you

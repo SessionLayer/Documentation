@@ -563,7 +563,7 @@ No new config tables; one new runtime table (`V27`).
 No new tables, and no new columns. Both are CHECK widenings plus one data back-fill.
 
 - `platform_role.permissions` gains `gateway:enroll` (`V28`), then `gateway:remove` and
-  `recording:key-manage` (`V29`), bringing the vocabulary to the twenty names listed under
+  `recording:key-manage` (`V29`), bringing the vocabulary to the twenty-one names listed under
   [Enums](#enums). `gateway:enroll` gates the Gateway enrollment-token API and the internal mTLS
   trust-anchor export, so installing a Gateway needs an API credential rather than raw `psql`. It is
   deliberately not `ca:manage`: exporting a public trust anchor is not CA administration.

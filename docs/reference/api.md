@@ -142,9 +142,12 @@ Three enums appear throughout:
 - Platform permissions (what an admin may call): `rbac:read`, `rbac:write`, `node:enroll`,
   `node:quarantine`, `node:remove`, `gateway:enroll`, `gateway:remove`, `ca:manage`, `ca:rotate`,
   `request:approve`, `recording:replay`,
-  `recording:export`, `recording:delete`, `recording:key-manage`, `audit:read`, `user:manage`,
-  `settings:write`, `lock:read`, `lock:write`, `breakglass:manage`. Twenty names; anything else in a
-  role is a `422`. This page is where the vocabulary is written out; the authoritative source is
+  `recording:export`, `recording:delete`, `recording:key-manage`, `audit:read`, `metrics:read`,
+  `user:manage`, `settings:write`, `lock:read`, `lock:write`, `breakglass:manage`. Twenty-one names,
+  grouped by domain rather than alphabetically, in the contract's order; anything else in a
+  role is a `422`. Bind `metrics:read` on its own, to the Prometheus scraper and nothing else: the
+  vocabulary grew rather than reusing `audit:read` precisely so that scraping metrics does not also
+  hand out the audit trail ([Metrics](metrics.md)). This page is where the vocabulary is written out; the authoritative source is
   `PlatformPermissions.ALL` in the Control Plane, mirrored exactly by the
   `platform_role.permissions` CHECK constraint. Nothing compares this page to either, so a
   permission added there is added here by hand.
@@ -207,7 +210,7 @@ Admin-issued SSH authentication shortcuts (see [Authentication](../admin-guides/
 | Operation | What it does | Notes |
 |---|---|---|
 | `POST /v1/otp` | Issue a single-use, short-TTL OTP bound to an identity | `user:manage`; raw OTP returned once |
-| `GET /v1/pins` | List one identity's active pins | `user:manage`; the `identity` query parameter is required, so the surface is never enumerable fleet-wide |
+| `GET /v1/pins` | List live pins; optional `identity` narrows to one | `user:manage`; the unfiltered form is what offboarding and incident review need |
 | `POST /v1/pins` | Pin a public-key fingerprint to an identity | `user:manage`; TTL capped at the authorization TTL |
 | `DELETE /v1/pins/{pinId}` | Revoke a pin | `user:manage`; idempotent |
 

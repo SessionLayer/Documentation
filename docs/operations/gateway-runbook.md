@@ -19,7 +19,26 @@ genuinely cannot verify.
 | `reason=authorization_denied`, `break_glass=true` | a break-glass authorize was denied, usually a matching lock (deny wins) | correlate with the CP [decision log](../admin-guides/audit.md). This is policy, not a fault |
 | `break-glass auth resolved to a non-BREAKGLASS access model` (warn) | token mis-binding or contract drift between the Gateway and CP | investigate. This should never happen in a healthy fleet |
 | `at connection capacity; dropping` (warn) | the outer leg hit `ssh.max_connections` and refused a handshake at accept. There is no queue, so this is the saturation signal, not a latency rise | raise the cap and the file-descriptor limit together, or add a Gateway. See [Capacity planning](capacity-planning.md) |
+| `outcome=policy_denied reason=credential_principal_scope_backstop` (warn) | the Control Plane **allowed** and the Gateway refused anyway: the authorized login is outside the presented credential's own scope. An anomaly, not the ordinary refusal | a Control Plane that predates the credential-scope field or ignores it. See below for what it leaves in the audit trail |
 | `non-sk-ecdsa security key offered; break-glass supports only sk-ecdsa` (warn) | an operator offered, for example, an `ed25519-sk` key for break-glass; it was routed to the ordinary pin path | re-provision the break-glass key as `ecdsa-sk`, see [Break-glass access](../admin-guides/break-glass.md) |
+
+The two credential-scope reasons are different events and only one is
+searchable in the audit stream. `credential_principal_scope` is the ordinary
+refusal, decided and recorded by the Control Plane. The
+`_backstop` variant above is the Gateway overruling a Control Plane that
+allowed, so the audit stream holds no denial for it at all: searching for the
+log string finds nothing, and searching for a denied decision finds nothing
+either.
+
+What it does leave is a recognisable shape on one `correlationId`: an
+`authz.decision` that **succeeded**, a `session.end` whose `endReason` is
+`error`, and no `recording.begin` between them. The Control Plane took the
+concurrency lease inside the allow, so the Gateway owes it a session-end from
+that moment and sends one on teardown; the lease is released rather than
+leaked. That shape is the only audit-side signal there is, and it is
+deliberate: the Control Plane is the sole writer of `authz.decision`, and
+giving the Gateway a path into the decision log to cover a
+compatibility-window anomaly would cost more than it buys.
 
 The high-priority break-glass alert is raised CP-side at authentication, so a
 break-glass use alerts even when no session follows it. The activation recorded

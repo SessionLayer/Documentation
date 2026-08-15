@@ -15,8 +15,8 @@ and dashboard.
 | Session-CA signing availability | 99.9%, measured on real sign requests | the session CA gates every new session (existing ones continue); it is an availability peer of your database, and it fails closed |
 
 Both are measured from meters the Control Plane emits (Micrometer to
-`/actuator/prometheus`, which is authenticated: see
-[Metrics](../reference/metrics.md)):
+`/actuator/prometheus`, which requires the `metrics:read` permission; see
+[Metrics](../reference/metrics.md) for the scrape config):
 
 - `sessionlayer_session_establishment_seconds_*`, a histogram tagged
   `outcome` (`allow`/`deny`/`error`/`cancelled`) and `access_model`.
