@@ -36,7 +36,7 @@ true end to end:
 3. Break-glass is an authorization override consumed at the Gateway: still a
    per-connection session certificate, still recorded, never a standing
    trust entry on any node. The trust set handed to nodes contains
-   session-kind keys only; this exclusion is directly tested.
+   session-kind keys only.
 
 A fourth authority, the internal X.509 CA, anchors the mTLS mesh between
 components (Control Plane ↔ Gateway ↔ Agent identities, the signed decision
@@ -230,16 +230,16 @@ by calling the vault and verified against that pinned public key before it is
 returned; a signature that does not verify, or that the vault returns in the
 wrong shape, fails closed rather than reaching a node.
 
-This path is proven end-to-end: a session CA rotated onto Key Vault this way,
-over the REST API with no database credential, then brokered a real SSH
-session through the Gateway to a node, with the certificate signed inside the
-vault. The same guard has been shown to hold at that boundary rather than only
-in isolation: a vault signing under a key other than the one pinned at
-adoption is refused, and the session fails closed instead of proceeding on an
-unverified certificate. This was proven against a Key Vault-compatible REST
-double driven by the genuine Azure SDK, not against Azure itself; an opt-in
-test against a real vault exists separately and is skipped without
-credentials.
+What this path has been exercised against, so you can size the risk of being
+first: a session CA rotated onto Key Vault over the REST API with no database
+credential, then brokered a real SSH session through the Gateway to a node
+with the certificate signed inside the vault; and, at that same boundary, a
+vault signing under a key other than the one pinned at adoption, which is
+refused with the session failing closed rather than proceeding on an
+unverified certificate. Both ran against a Key Vault-compatible REST double
+driven by the genuine Azure SDK, not against Azure itself. An opt-in test
+against a real vault exists and is skipped without credentials, so validate
+this against your own vault before you depend on it.
 
 > **Warning:** the key version is mandatory and must be a real Key Vault
 > version — 32 lowercase hex characters — not merely present: a blank value

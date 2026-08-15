@@ -1,10 +1,9 @@
 # Production hardening
 
-SessionLayer's production sign-off is explicitly production-grade under the
-operator preconditions, and this page is those preconditions: an ordered
-checklist with commands. Work through it top to bottom before the platform
-carries real access. Every item here exists because skipping it reopens a
-documented risk.
+This page is the set of operator preconditions the platform assumes: an
+ordered checklist with commands. Work through it top to bottom before the
+platform carries real access. Every item here exists because skipping it
+reopens a risk named in the [trust model](trust-model.md).
 
 The quick self-audit:
 
@@ -13,7 +12,8 @@ The quick self-audit:
 - [ ] 2. Real `cp_runtime` DB password; restricted role verified; Postgres HA
       with synchronous replication for authz/audit
 - [ ] 3. A real generated KEK protecting every CA still on `local` (never the
-      dev default); SSH CAs optionally adopted onto `azure_keyvault`
+      dev default); SSH CAs optionally adopted onto `azure_keyvault` or
+      `aws_kms`
 - [ ] 4. Customer recording key provisioned; private half offline
 - [ ] 5. WORM mode chosen deliberately; audit forwarded off-box to a SIEM
 - [ ] 6. A session-limit cluster default set (the shipped default is

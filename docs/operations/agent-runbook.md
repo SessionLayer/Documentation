@@ -157,8 +157,9 @@ needs node-root compromise, not merely a compromised Agent: putting an
 agent on the node raises this bar rather than lowering it. The
 Gateway's no-TOFU host verification is what actually catches a splice
 to an impostor; the Agent is not a party to that check and cannot
-weaken it. A Docker end-to-end test asserts the Agent account cannot
-read the host key.
+weaken it. `Agent/tests/splice_e2e.rs` asserts this directly, running
+`cat /etc/ssh/ssh_host_ed25519_key` as uid 65532 on the node and
+requiring it to fail.
 
 ## The node-local sshd second trail
 
