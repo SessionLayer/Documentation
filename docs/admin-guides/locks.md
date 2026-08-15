@@ -100,8 +100,8 @@ again.
 
 Locks ride an actively pushed deny-list: the Control Plane streams the lock
 set to every Gateway, which holds it locally and resyncs in full on every
-reconnect. The design rule, the platform's safety spine, is *allow may fail
-open; deny must fail closed; deny wins*:
+reconnect. The platform's safety spine is *allow may fail open; deny must
+fail closed; deny wins*:
 
 - A Gateway whose lock feed is unhealthy stops trusting its cached allows. It
   forces re-validation and refuses what it cannot confirm, including

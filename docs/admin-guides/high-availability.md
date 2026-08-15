@@ -60,7 +60,7 @@ hang your SSH handshake), and the next tick self-heals. Deny-wins is
 preserved under every partition. A Gateway that cannot confirm the lock feed
 refuses what it cannot verify.
 
-## What NFR-1 fleet survival means
+## What fleet survival means
 
 Losing one instance:
 

@@ -150,21 +150,21 @@ refuse to start. No Gateway, however compromised, can redirect the splice or
 use the Agent as a pivot into the node's subnet. This is structural, not a
 runtime check on untrusted input.
 
-The Agent's non-root posture (FR-CONN-6, Design §9.3) backs the same
-boundary from the other side: it runs as uid 65532 and therefore cannot
-read the node's host key (`/etc/ssh/ssh_host_*`, root-only), so spoofing
-the node's identity needs node-root compromise, not merely a compromised
-Agent: putting an agent on the node raises this bar rather than lowering
-it. The Gateway's no-TOFU host verification is what actually catches a
-splice to an impostor; the Agent is not a party to that check and cannot
-weaken it. A Docker end-to-end test asserts the Agent account cannot read
-the host key.
+The Agent's non-root posture backs the same boundary from the other
+side: it runs as uid 65532 and therefore cannot read the node's host
+key (`/etc/ssh/ssh_host_*`, root-only), so spoofing the node's identity
+needs node-root compromise, not merely a compromised Agent: putting an
+agent on the node raises this bar rather than lowering it. The
+Gateway's no-TOFU host verification is what actually catches a splice
+to an impostor; the Agent is not a party to that check and cannot
+weaken it. A Docker end-to-end test asserts the Agent account cannot
+read the host key.
 
 ## The node-local sshd second trail
 
 The node's own `sshd` log is a second, tamper-independent record of every
-session (FR-AUD-4). The inner-leg certificate's `key_id` is `session_id`
-plus identity, and a node running `LogLevel VERBOSE` (set in the canonical
+session. The inner-leg certificate's `key_id` is `session_id` plus
+identity, and a node running `LogLevel VERBOSE` (set in the canonical
 `testing/docker/sshd/sshd_config`, and required on real nodes) logs that
 key ID on every accepted certificate.
 

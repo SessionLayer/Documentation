@@ -336,8 +336,8 @@ as how stale this page might be.
 
 ## What was proven
 
-Every requirement in the platform's specification is mapped to a direct
-test, and the nine load-bearing invariants each carry a break-it test that
+Every requirement the platform commits to is mapped to a direct test,
+and the nine load-bearing invariants each carry a break-it test that
 fails if the invariant is removed: deny-fails-closed, lock supremacy, no
 self-approval, inner-key custody, customer-key unreadability, no-TOFU,
 single-use tokens, clone detection, verify-before-run. Two requirements are

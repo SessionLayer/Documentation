@@ -117,7 +117,7 @@ were transferred, without the platform storing the bytes.
 > **Note:** the SHA-256 lets an auditor prove a specific file crossed the
 > boundary (hash it and compare) without the platform ever holding the
 > file. If your compliance regime requires content capture, SessionLayer
-> does not provide it. That is a stated design boundary, not a toggle.
+> does not provide it. That is a deliberate design boundary, not a toggle.
 
 ## Next
 

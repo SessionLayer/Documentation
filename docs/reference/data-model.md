@@ -199,7 +199,7 @@ during a repair is idempotent.
 
 ### Reserved SQL names
 
-| Design name | Physical table | Note |
+| Entity | Physical table | Note |
 |---|---|---|
 | `session` | `runtime.ssh_session` | `session` is a reserved word. |
 | `lock` | `runtime.access_lock` | `lock` is reserved/fragile; also the clearest place to encode "API-only". |
@@ -544,7 +544,7 @@ No new config tables; one new runtime table (`V27`).
   seal a forgery) or Gateway could shadow a finalized recording with a re-sealed object at the same
   key. Recording the version id the Gateway actually `PUT` and pinning replay/export to it makes the
   finalized bytes the only ones ever served; a DB superuser rewriting the column is the same residual
-  the deferred external Merkle anchor (`FR-AUD-10`) is meant to address.
+  the deferred external Merkle anchor is meant to address.
 - `ix_ssh_session_active_identity` (`V25`): partial index on `ssh_session (identity) WHERE ended_at IS
   NULL`, backing the config-API session-listing `activeOnly` filter by identity; `idx_session_live`
   (`V5`) is keyed on `node_id` and doesn't serve this path. No new table.
