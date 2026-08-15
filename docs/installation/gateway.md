@@ -41,6 +41,15 @@ unready or draining before the pod stops listening.
 
 ## Get the image
 
+> **Warning:** the `ghcr.io/sessionlayer/*` packages are private. An
+> unauthenticated `docker pull` fails, and so does everything downstream
+> of it: `docker buildx imagetools inspect` cannot resolve a digest,
+> `cosign verify` and `gh attestation verify` cannot reach the manifest,
+> and any `--set image.digest="$DIGEST"` gets an empty variable. Until the
+> packages are made public, building from source (below) is the path that
+> works. The commands below are correct and are what to run once you have
+> registry access.
+
 ```bash
 docker pull ghcr.io/sessionlayer/gateway:v0.0.2
 ```
@@ -254,7 +263,7 @@ The chart refuses to render rather than installing something unsafe:
 | `replicaCount` above 1 | One release deploys one Gateway. Every pod reads the same configuration, so they enroll with the same single-use token and all but the first crash-loop on `UNAUTHENTICATED`. With `persistence.enabled` they would instead share one data directory, and one identity used twice reads to the Control Plane as a clone, which auto-locks it. |
 | `podDisruptionBudget.minAvailable` not below `replicaCount` | Such a budget refuses every voluntary eviction and hangs a node drain. |
 
-Two values worth setting deliberately:
+Three values worth setting deliberately:
 
 - `persistence.enabled` is `false`, so a restart re-enrolls and needs a fresh
   single-use token every time. Turn it on for anything but evaluation. A claim

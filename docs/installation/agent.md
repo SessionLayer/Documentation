@@ -124,6 +124,15 @@ startup failure for regimes that cannot accept it.
 
 ## Run it in a container
 
+> **Warning:** the `ghcr.io/sessionlayer/*` packages are private. An
+> unauthenticated `docker pull` fails, and so does everything downstream
+> of it: `docker buildx imagetools inspect` cannot resolve a digest,
+> `cosign verify` and `gh attestation verify` cannot reach the manifest,
+> and any `--set image.digest="$DIGEST"` gets an empty variable. Until the
+> packages are made public, the verified release binary above, or building
+> the image from `deploy/Dockerfile` is the path that works. The commands
+> below are correct and are what to run once you have registry access.
+
 ```bash
 docker pull ghcr.io/sessionlayer/agent:v0.0.2
 ```

@@ -89,6 +89,12 @@ Every chart takes `image.repository`, `image.tag` and `image.digest`. An empty
 tag resolves to the chart's `appVersion`, which is the component release the
 chart was published for. A digest wins over a tag whenever both are set:
 
+> **Warning:** the `ghcr.io/sessionlayer/*` packages are private, so the
+> `imagetools inspect` below returns nothing and `$DIGEST` is empty. Until they
+> are public, build each image yourself, push it to a registry your cluster
+> pulls from, and set `image.repository` and `image.digest` to that. Every
+> component's installation page covers its own build.
+
 ```bash
 DIGEST=$(docker buildx imagetools inspect ghcr.io/sessionlayer/controlplane:v0.0.2 \
   --format '{{json .Manifest}}' | jq -r .digest)

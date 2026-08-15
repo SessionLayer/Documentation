@@ -379,7 +379,7 @@ gRPC port, your node subnet on 22, and the WORM store) after scoping its
 CIDRs to your fleet:
 
 ```bash
-kubectl apply -f Gateway/deploy/kubernetes/networkpolicy.yaml
+kubectl apply -f deploy/kubernetes/networkpolicy.yaml
 ```
 
 The Gateway chart renders the same policy, on by default, from

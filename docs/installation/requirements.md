@@ -38,6 +38,11 @@ signed and attested in the registry. Verifying one needs `cosign`, plus the
 GitHub CLI for the provenance and `docker buildx` for the SBOM
 ([Supply chain](../security/supply-chain.md)).
 
+> **Warning:** these packages are private today, so an unauthenticated pull
+> fails and so does every verification step that has to reach the manifest.
+> Build from source until they are public; each component's installation page
+> has the commands, and a build you performed is its own provenance.
+
 Each chart lives in its component's repository and declares
 `kubeVersion: >=1.21.0-0`, the floor for a `policy/v1` PodDisruptionBudget.
 Every chart renders a NetworkPolicy unless you turn it off, permitting only the

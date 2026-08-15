@@ -20,9 +20,11 @@ locked) and a startup renewal both classify the same way.
 
 > **Warning:** configure the orchestrator so codes 3 and 4 page and do not
 > silently restart. A blind restart loop turns a security signal into noise.
-> On systemd: `Restart=on-failure` and `RestartPreventExitStatus=3 4`. On
-> Kubernetes, `restartPolicy: OnFailure` will loop, so alert on the exit code
-> instead.
+> On systemd: `Restart=on-failure` and `RestartPreventExitStatus=3 4`. A
+> Kubernetes DaemonSet cannot express this at all: its pods only accept
+> `restartPolicy: Always`, so kubelet restarts the container whatever it
+> exited with. Alert on the exit code instead, per
+> [Monitoring](monitoring.md).
 
 ## Alert: `SECURITY: generation mismatch on renewal ... auto-locked` (exit 3)
 
@@ -165,9 +167,9 @@ requiring it to fail.
 
 The node's own `sshd` log is a second, tamper-independent record of every
 session. The inner-leg certificate's `key_id` is `session_id` plus
-identity, and a node running `LogLevel VERBOSE` (set in the canonical
-`testing/docker/sshd/sshd_config`, and required on real nodes) logs that
-key ID on every accepted certificate.
+identity, and a node running `LogLevel VERBOSE` logs that key ID on every
+accepted certificate. Setting it is part of preparing a node's `sshd`
+([Nodes](../admin-guides/nodes.md)).
 
 The Agent deliberately does not forward this log. The whole value of a
 second trail is that it does not depend on the Agent: the Agent neither
