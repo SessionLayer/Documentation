@@ -299,21 +299,26 @@ static-validation-only status they ship with.
 The binary hardens itself at startup: privilege drop (bare-metal), a Landlock
 filesystem and egress sandbox, and a seccomp syscall allow-list. The
 container/systemd assets add the OS layer on top. Neither layer trusts the
-other:
+other. `hardening` is a top-level key of the same `gateway.json`:
 
 ```json
-"hardening": {
-  "run_as_user": "sessionlayer",
-  "landlock": {
-    "enabled": true,
-    "read_only_paths": ["/etc/sessionlayer", "/etc/ssl/certs", "/etc/resolv.conf",
-                        "/etc/hosts", "/etc/nsswitch.conf", "/lib", "/lib64",
-                        "/usr/lib", "/dev", "/proc"],
-    "read_write_paths": ["/var/lib/sessionlayer-gateway"]
-  },
-  "seccomp": { "mode": "enforce" }
+{
+  "hardening": {
+    "run_as_user": "sessionlayer",
+    "landlock": {
+      "enabled": true,
+      "read_only_paths": ["/etc/sessionlayer", "/etc/ssl/certs", "/etc/resolv.conf",
+                          "/etc/hosts", "/etc/nsswitch.conf", "/lib", "/lib64",
+                          "/usr/lib", "/dev", "/proc"],
+      "read_write_paths": ["/var/lib/sessionlayer-gateway"]
+    },
+    "seccomp": { "mode": "enforce" }
+  }
 }
 ```
+
+The file is strict JSON: no comments, no trailing commas. Merge this key into
+the object you wrote above rather than keeping it in a second file.
 
 `read_only_paths` has no default, and Landlock denies whatever no rule
 allows. An empty list therefore confines the Gateway to `data_dir` alone,

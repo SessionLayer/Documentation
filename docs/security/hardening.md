@@ -333,22 +333,34 @@ sessionlayer.session-limits.default-idle-timeout-seconds=1800
 
 The Gateway is Tier-0, the only place session plaintext exists. Run it with
 the full in-process profile (privilege drop after binding `:22`, seccomp
-enforce, Landlock, coredumps off):
+enforce, Landlock, coredumps off). Add `hardening` as a top-level key of the
+`/etc/sessionlayer/gateway.json` you wrote in
+[Install the Gateway](../installation/gateway.md):
 
-```jsonc
-// /etc/sessionlayer/gateway.json: the hardening block
-"hardening": {
-  "run_as_user": "sessionlayer",          // bare-metal: drop after bind; container: starts non-root
-  "landlock": {
-    "enabled": true,
-    "read_only_paths": ["/etc/sessionlayer", "/etc/ssl/certs", "/etc/resolv.conf",
-                        "/etc/hosts", "/etc/nsswitch.conf", "/lib", "/lib64", "/usr/lib",
-                        "/dev", "/proc"],
-    "read_write_paths": ["/var/lib/sessionlayer-gateway"]
-  },
-  "seccomp": { "mode": "enforce" }
+```json
+{
+  "hardening": {
+    "run_as_user": "sessionlayer",
+    "landlock": {
+      "enabled": true,
+      "read_only_paths": ["/etc/sessionlayer", "/etc/ssl/certs", "/etc/resolv.conf",
+                          "/etc/hosts", "/etc/nsswitch.conf", "/lib", "/lib64", "/usr/lib",
+                          "/dev", "/proc"],
+      "read_write_paths": ["/var/lib/sessionlayer-gateway"]
+    },
+    "seccomp": { "mode": "enforce" }
+  }
 }
 ```
+
+> **Warning:** the Gateway parses this file as strict JSON. A `//` comment, a
+> trailing comma, or a fragment pasted without its enclosing braces fails
+> startup with `Error: parsing gateway config <path>: key must be a string`,
+> before any hardening is applied. Merge the key above into your existing
+> object rather than pasting the block on its own.
+
+`run_as_user` drops privilege after the bind on bare metal and does nothing in
+the container image, which already starts non-root.
 
 Roll seccomp out as `off → log → enforce`: in `log` mode, run a full
 shell/exec/SFTP session and confirm `dmesg`/auditd shows no unexpected
