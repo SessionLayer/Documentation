@@ -112,6 +112,25 @@ curl -s https://cp.example.com/v1/nodes \
 > sessions to it will (correctly) abort. See
 > [Repair or rotate a node's host anchor](#repair-or-rotate-a-nodes-host-anchor).
 
+Confirm it landed, and that the anchor came with it:
+
+```bash
+curl -s https://cp.example.com/v1/nodes \
+  -H "Authorization: Bearer $TOKEN" | jq '.nodes[] | {name, status, health}'
+```
+
+```json
+{
+  "name": "web-01",
+  "status": "active",
+  "health": "unknown"
+}
+```
+
+`unknown` is the right answer for an agentless node and is not a fault; see
+[Node lifecycle at a glance](#node-lifecycle-at-a-glance). What would be wrong
+is `unhealthy`, which means the anchor did not register.
+
 `labels` are what [data-plane rules](rbac.md) and [locks](locks.md) select
 on. Label nodes at enrollment time, not later during an incident.
 

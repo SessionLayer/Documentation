@@ -185,6 +185,16 @@ docker compose exec -T client ssh -p 2222 -o StrictHostKeyChecking=accept-new \
   deploy%web-01@gateway 'echo hello from $(hostname); id -un'
 ```
 
+```text
+Warning: Permanently added '[gateway]:2222' (ED25519) to the list of known hosts.
+hello from web-01
+deploy
+```
+
+The warning is `accept-new` recording the front door's key on first contact,
+and appears once. `deploy` is the Linux login the rule resolved to, printed by
+the node itself.
+
 That's a stock `ssh` client addressing node `web-01` as login `deploy` through
 the Gateway (the `login%node` username encoding; the
 [SSH access guide](../user-guide/ssh-access.md) shows two more addressing

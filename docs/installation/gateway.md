@@ -406,6 +406,14 @@ curl -s -G https://cp.example.com/v1/gateways \
   --data-urlencode "name=gw-1" | jq '.items[] | {name, status, fingerprintSha256}'
 ```
 
+```json
+{
+  "name": "gw-1",
+  "status": "active",
+  "fingerprintSha256": "eab996c8cceed7c1b7c43661efd1673e95563e2679d546040cce18ce298d5f85"
+}
+```
+
 A row with your Gateway's name is an enrolled, lockable principal. An empty
 `items` list means the Gateway is running on compiled-in defaults and has not
 enrolled at all.

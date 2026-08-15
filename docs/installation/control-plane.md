@@ -552,18 +552,39 @@ at boot).
 
 ## Verify
 
+All three of these are public, so they work before any admin exists:
+
 ```bash
 curl -s http://localhost:8080/v1/healthz
 curl -s http://localhost:8080/v1/version
 curl -s http://localhost:8080/actuator/health/readiness
 ```
 
-Expect a healthy status from the readiness check and a real version string
-from `/v1/version`. Confirm the gRPC plane is listening too:
+```text
+{"status":"pass"}
+{"component":"SessionLayer Control Plane","version":"0.0.2","protocols":{"controlPlaneGatewayGrpc":{"min":"1.0","max":"1.1"},"agentGatewayWire":{"min":"1.0","max":"1.0"}}}
+{"status":"UP"}
+```
+
+`readiness` reporting `UP` is the load-bearing one: it does not report ready
+until Flyway and both startup runners (CA provisioning, first-admin bootstrap)
+have finished, so a `DOWN` here during a first boot usually means migrations
+are still running rather than that something failed. Give it the full startup
+budget before investigating.
+
+Confirm the gRPC plane is listening too:
 
 ```bash
 nc -zv localhost 9443
 ```
+
+```text
+Connection to localhost (127.0.0.1) 9443 port [tcp/*] succeeded!
+```
+
+A refused connection here with a healthy REST surface is the port mismatch
+described above: the built-in default is `9090` and nothing in the image moves
+it.
 
 ## Next
 
