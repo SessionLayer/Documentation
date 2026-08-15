@@ -102,18 +102,23 @@ node side (`LOCAL_DIAL_FAILED` means the node's own `sshd` is down; a
 reconnect loop means a TLS/server-name/version mismatch; all channels down
 means use out-of-band recovery).
 
-Also check the boring one first: `GET /v1/nodes`. Is the node `active` and
-`healthy`, or did someone quarantine it?
+Also check the boring one first: `GET /v1/nodes`. Is the node `active`, or did
+someone quarantine it? Read `health` alongside it, but read it correctly: an
+agentless node is *always* `unknown` and that is not a fault, so the value
+worth reacting to is `unhealthy`, which means the node has no host-identity
+anchor and every session to it aborts. `GET /v1/nodes/{nodeId}/host-anchors`
+returning an empty list confirms it ([Nodes](../admin-guides/nodes.md)).
 
 ## Host-identity verification failures
 
 A session that dies at the inner leg with a host-verification abort (and a
 `gateway.host_verify` error span or log) means the node presented a key or
 certificate that does not match its enrolled anchor. This is the no-TOFU
-guarantee working. Either the node was re-keyed without re-enrollment
-(update its anchor, see [Nodes](../admin-guides/nodes.md)), or something is
-impersonating the node; investigate before you fix it. The user sees only
-the generic node-unreachable message; the detail is operator-side.
+guarantee working. Either the node was re-keyed without its anchor being
+updated (replace the anchor set with `PUT /v1/nodes/{nodeId}/host-anchors`,
+see [Nodes](../admin-guides/nodes.md)), or something is impersonating the
+node; investigate before you fix it. The user sees only the generic
+node-unreachable message; the detail is operator-side.
 
 ## "Session cannot start: recording unavailable"
 
