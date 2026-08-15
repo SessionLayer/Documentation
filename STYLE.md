@@ -71,7 +71,7 @@ fix.
 
 | Do not write | Write instead |
 |---|---|
-| "In this guide, we'll walk through X, Y and Z" | Delete it. Start at step 1. Google: "Don't pre-announce anything in documentation." |
+| "In this guide, we'll walk through X, Y and Z", and any preamble that carries no fact | Delete it. Start at step 1. Google: "Don't pre-announce anything in documentation." One sentence naming the page's scope is not this, and is what Teleport and Tailscale do on their own how-tos. |
 | "It's important to note that", "generally speaking", "essentially" | State the fact, or scope it precisely: "on Linux hosts". |
 | Spaced em dashes as connective tissue, several per paragraph | A full stop, or a comma. See §3. |
 | "Simply run", "just configure", "easily" | Delete the adverb. Banned by Google and by Kubernetes. |
@@ -229,18 +229,24 @@ Diátaxis is enforced **per page** (§5), not by URL. A page in `admin-guides/` 
 in `reference/` is reference; mixing modes on one page is the defect, not the directory it lives
 in.
 
-`docs/SUMMARY.md` is the navigation source of truth and is gate-checked against the tree. Any page
-added, removed or moved must update it in the same commit.
+`docs/SUMMARY.md` is the navigation source of truth. Any page added, removed or moved must update
+it in the same commit. Nothing checks this for you.
 
 ## 12. Checking your work
 
-Before a page is done, run these against it:
+These are authoring aids, not gates. Nothing runs them, and a page that passes them is not
+thereby correct:
 
 ```bash
-grep -c ' — ' PAGE.md                                # spaced em dashes: expect 0
+grep -n ' — ' PAGE.md                                # each hit: would a full stop be better?
 grep -oP '\*\*[^*]+\*\*' PAGE.md                     # every hit must be a clickable UI element
-grep -oiE '\b(simply|just|easily|easy|please)\b' PAGE.md   # expect none
+grep -oiE '\b(simply|just|easily|easy|please)\b' PAGE.md   # excluding product strings and "just-in-time"
 ```
 
-Then read the first sentence out loud. If it announces the page instead of stating a fact, rewrite
-it.
+The em-dash grep is a prompt, not a threshold. Most hits are two clauses that wanted a full stop
+(§3), and existing pages still carry some; a rewrite that only moves that count is not an
+improvement and is not wanted.
+
+Then read the first sentence out loud. If it is content-free preamble, cut it. One sentence naming
+what the page covers is fine, and is what the reference set does on its own how-to pages; what §2
+bans is the sentence that announces the page instead of telling the reader anything.
