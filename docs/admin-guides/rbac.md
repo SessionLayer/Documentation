@@ -290,22 +290,11 @@ curl -s https://cp.example.com/v1/role-bindings \
   }'
 ```
 
-The closed permission vocabulary, twenty names: `rbac:read`, `rbac:write`,
-`node:enroll`, `node:quarantine`, `node:remove`, `gateway:enroll`,
-`gateway:remove`, `ca:manage`, `ca:rotate`, `request:approve`,
-`recording:replay`, `recording:export`, `recording:delete`,
-`recording:key-manage`, `audit:read`, `user:manage`, `settings:write`,
-`lock:read`, `lock:write`, `breakglass:manage`. Anything outside it is a
-`422`.
+The permission vocabulary is closed, and anything outside it is a `422`. The
+twenty names are listed in the
+[API reference](../reference/api.md#closed-vocabularies).
 
-The authoritative list is `PlatformPermissions.ALL` in the Control Plane
-source, mirrored exactly by the `platform_role.permissions` CHECK constraint;
-the two must agree or the first-admin bootstrap fails at boot. This page, the
-[API reference](../reference/api.md#closed-vocabularies) and the
-[data model](../reference/data-model.md#enums) restate that list, and a docs
-CI check fails when any of the three drifts from the source.
-
-Two of the twenty are not implied by any other and are easy to miss when you
+Two of them are not implied by any other and are easy to miss when you
 assemble an admin role by hand: `recording:key-manage`, without which nobody
 can provision the customer recording key and every session is refused
 ([Session recording](session-recording.md)), and `gateway:remove`, without

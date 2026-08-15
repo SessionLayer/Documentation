@@ -130,10 +130,10 @@ Three enums appear throughout:
   `request:approve`, `recording:replay`,
   `recording:export`, `recording:delete`, `recording:key-manage`, `audit:read`, `user:manage`,
   `settings:write`, `lock:read`, `lock:write`, `breakglass:manage`. Twenty names; anything else in a
-  role is a `422`. The authoritative list is `PlatformPermissions.ALL` in the Control Plane source,
-  mirrored exactly by the `platform_role.permissions` CHECK constraint. A docs CI check fails when
-  this page, [RBAC](../admin-guides/rbac.md) or the [data model](data-model.md#enums) drifts from
-  it.
+  role is a `422`. This page is where the vocabulary is written out; the authoritative source is
+  `PlatformPermissions.ALL` in the Control Plane, mirrored exactly by the
+  `platform_role.permissions` CHECK constraint. Nothing compares this page to either, so a
+  permission added there is added here by hand.
 - Access models: `standing`, `jit`, `breakglass`.
 
 ## Meta

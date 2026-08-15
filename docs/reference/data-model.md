@@ -111,19 +111,14 @@ is deliberate:
   session at the first recording, so the refusal happens at the write, where the error can still
   name the cause.
 
-Platform-permission vocabulary (every element of `platform_role.permissions` must be a member,
-widened by `V18`/`V20`/`V23`/`V28`/`V29`): `rbac:read`, `rbac:write`, `node:enroll`,
-`node:quarantine`, `node:remove`, `gateway:enroll`, `gateway:remove`, `ca:manage`, `ca:rotate`,
-`request:approve`, `recording:replay`, `recording:export`, `recording:delete`,
-`recording:key-manage`, `audit:read`, `user:manage`, `settings:write`, `lock:read`, `lock:write`,
-`breakglass:manage`.
+`platform_role.permissions` carries a CHECK admitting exactly the platform-permission
+vocabulary, widened by `V18`/`V20`/`V23`/`V28`/`V29`. The names are listed once, in the
+[API reference](api.md#closed-vocabularies).
 
 Unlike the enum table above, this set is not merely mirrored by the application: the CHECK and
 `PlatformPermissions.ALL` must be identical, because the seeded `platform-admin` role carries every
 member and a divergence makes the first-admin bootstrap violate the constraint at boot. The Control
-Plane's `MigrationIntegrityIT` asserts that lockstep, and a docs CI check asserts that this page,
-[RBAC](../admin-guides/rbac.md) and the [API reference](api.md#closed-vocabularies) all still match
-the source.
+Plane's `MigrationIntegrityIT` asserts that lockstep.
 
 ### Structured selectors and sets
 
