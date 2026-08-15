@@ -86,13 +86,37 @@ Admins can list and revoke pins, and pins are revoked automatically on
 offboarding, on a lock, and on OIDC back-channel logout where the IdP
 supports it:
 
-```bash
-curl -s https://cp.example.com/v1/pins -H "Authorization: Bearer $TOKEN"
+Listing is per identity. `identity` is a required query parameter, so there
+is no fleet-wide pin listing to enumerate; ask about one person at a time.
+Both calls need `user:manage`:
 
+```bash
+curl -s -G https://cp.example.com/v1/pins \
+  -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode "identity=alice@example.com" | jq '.pins[] | {id, fingerprint, principals, expiresAt}'
+```
+
+```json
+{
+  "id": "01a00706-7066-7c44-bedc-60d5b9a0b3f7",
+  "fingerprint": "SHA256:vksMx43C7+OSA/Dl6FUMVuJm46mwAEMoKQgwJb5HR2U",
+  "principals": ["deploy", "dba"],
+  "expiresAt": "2026-08-15T21:04:17.637795Z"
+}
+```
+
+```bash
 # PIN_ID is the id of the pin to revoke, from the list above.
 curl -s -X DELETE https://cp.example.com/v1/pins/$PIN_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+> **Warning:** omitting `identity` is a `400` whose body names nothing
+> (`{"status":400,"error":"Bad Request","requestId":"…"}`), because the
+> rejection happens before the request reaches a handler. Offboarding is the
+> case that matters: a pin authenticates on its own and outlives the session
+> it was created for, so revoking an identity's access means listing its pins
+> by name and revoking them, not only ending its sessions.
 
 ## Pre-issued OTPs
 

@@ -53,14 +53,28 @@ Cursors are opaque and forward-only; an unrecognized cursor is a `400`. A page e
 ```
 
 A `null` or absent `nextCursor` means you have the last page. This applies to rules, roles, role
-bindings, CAs, service accounts, node policies, capability definitions, JIT/break-glass/session-limit
-policies, sessions, recordings, and audit events: the endpoints whose tables below say
-"cursor-paginated".
+bindings, CAs, gateways, service accounts, node policies, capability definitions,
+JIT/break-glass/session-limit policies, sessions, session leases, recordings, and audit events: the
+endpoints whose tables below say "cursor-paginated".
 
 The bounded runtime listings return the full set in one response instead, in a resource-named
-array with no cursor: `pins`, `locks`, `joinTokens`, `nodes`, `jitRequests`, and the break-glass
-`credentials`, `offlineCodes`, and `activations`. So `GET /v1/nodes` yields `{"nodes": [...]}`.
-Pipe it through `jq '.nodes[]'`, not `.items[]`.
+array with no cursor. That array's key is the resource, not `items`:
+
+| Listing | Envelope key |
+|---|---|
+| `GET /v1/nodes` | `nodes` |
+| `GET /v1/pins` | `pins` |
+| `GET /v1/locks` | `locks` |
+| `GET /v1/join-tokens` | `joinTokens` |
+| `GET /v1/gateway-enrollment-tokens` | `gatewayEnrollmentTokens` |
+| `GET /v1/jit-requests` | `jitRequests` |
+| `GET /v1/breakglass/credentials` | `credentials` |
+| `GET /v1/breakglass/offline-codes` | `offlineCodes` |
+| `GET /v1/breakglass/activations` | `activations` |
+
+So `GET /v1/nodes` yields `{"nodes": [...]}`: pipe it through `jq '.nodes[]'`, not `.items[]`. A
+`jq` filter naming the wrong key returns nothing rather than failing, which reads like an empty
+collection.
 
 ### Idempotency
 
@@ -193,9 +207,9 @@ Admin-issued SSH authentication shortcuts (see [Authentication](../admin-guides/
 | Operation | What it does | Notes |
 |---|---|---|
 | `POST /v1/otp` | Issue a single-use, short-TTL OTP bound to an identity | `user:manage`; raw OTP returned once |
-| `GET /v1/pins` | List pins for an identity | Requires the `identity` query parameter |
-| `POST /v1/pins` | Pin a public-key fingerprint to an identity | TTL capped at the authorization TTL |
-| `DELETE /v1/pins/{pinId}` | Revoke a pin | Idempotent |
+| `GET /v1/pins` | List one identity's active pins | `user:manage`; the `identity` query parameter is required, so the surface is never enumerable fleet-wide |
+| `POST /v1/pins` | Pin a public-key fingerprint to an identity | `user:manage`; TTL capped at the authorization TTL |
+| `DELETE /v1/pins/{pinId}` | Revoke a pin | `user:manage`; idempotent |
 
 An issued OTP returns `otpId`, the raw `otp` (exactly once: only its hash is stored; deliver it
 out-of-band), and `expiresAt`. A pin binds a key `fingerprint` to `{identity, sourceCidr, principals}`
@@ -207,8 +221,8 @@ Runtime credentials for a [service account](#service-accounts) definition.
 
 | Operation | What it does | Notes |
 |---|---|---|
-| `POST /v1/service-accounts/{serviceAccountId}/credentials` | Issue a rotatable machine credential | `private_key_jwt` key/JWKS ref, mTLS cert fingerprint, or (discouraged) a generated secret returned once |
-| `DELETE /v1/service-accounts/{serviceAccountId}/credentials/{credentialId}` | Revoke a credential | Takes effect immediately |
+| `POST /v1/service-accounts/{serviceAccountId}/credentials` | Issue a rotatable machine credential | `user:manage`; `private_key_jwt` key/JWKS ref, mTLS cert fingerprint, or (discouraged) a generated secret returned once |
+| `DELETE /v1/service-accounts/{serviceAccountId}/credentials/{credentialId}` | Revoke a credential | `user:manage`; takes effect immediately, and the account itself survives |
 
 Credentials are stored hashed or by reference. The API never returns stored secret material.
 
@@ -327,6 +341,8 @@ Node lifecycle: agentless registration, listing, quarantine, and removal. Agent 
 | `DELETE /v1/nodes/{nodeId}` | Remove (deregister) a node | `node:remove`; revokes an agent node's credential |
 | `POST /v1/nodes/{nodeId}/quarantine` | Quarantine a node | `node:quarantine`; expressed as a lock, deny wins |
 | `DELETE /v1/nodes/{nodeId}/quarantine` | Release a node from quarantine | `node:quarantine` |
+| `GET /v1/nodes/{nodeId}/host-anchors` | Read the node's host-identity anchors | `node:enroll`; public material only. An empty list is the diagnosis for a node whose every session aborts |
+| `PUT /v1/nodes/{nodeId}/host-anchors` | Replace the anchor set atomically | `node:enroll`; the repair path for an anchorless node and the host-key rotation operation. `422` on an empty set, `409` on a `removed` node |
 
 Registration takes the node's `name`, dial `address`, `labels`, and its host identity: a
 host-CA-signed `hostCertificate` or an explicitly pinned `pinnedHostKey` (at least one). When
@@ -337,16 +353,33 @@ finish but refuses new channels. Removal is soft (status `removed`, history pres
 agent node, flips its identity off `active` and pushes a covering lock so a stale clone stays
 unusable.
 
+`PUT /v1/nodes/{nodeId}/host-anchors` replaces the whole anchor set in one transaction, so the node
+is never briefly anchorless and never briefly still trusting a superseded key. It is idempotent by
+desired state. Use it to rotate a re-keyed node's host identity, and to repair a node that has no
+anchor at all: an Agent joining under a name nobody registered auto-creates its node without one,
+and every session to it then aborts at host verification. `GET` on the same path is how you tell
+that case apart from a network problem, since an empty `anchors` list is the diagnosis.
+
+`health` and `owningGateway` on a node are computed per request and never stored. `health` resolves
+in order: a node with no host anchor is `unhealthy` (enrolled, but every session to it aborts, so
+repair the anchor); otherwise an agent node is `healthy` while a Gateway holds its control channel,
+`unreachable` once that heartbeat has gone stale, and `unknown` when no Gateway has ever claimed it.
+An agentless node is **always** `unknown`, which reports nothing wrong: the Control Plane holds no
+continuous liveness signal for a node it dials on demand and runs no probe of its own.
+`owningGateway` names the Gateway currently holding an agent node's control channel on a fresh
+heartbeat, and is absent otherwise, including for every agentless node.
+
 ## JIT requests
 
 Just-in-time access requests and the approval chain. Submitting is open to any authenticated
-principal; approve/deny/revoke require `request:approve`. See [JIT access](../admin-guides/jit-access.md).
+principal; reading one request and approve/deny/revoke all require `request:approve`. See
+[JIT access](../admin-guides/jit-access.md).
 
 | Operation | What it does | Notes |
 |---|---|---|
 | `GET /v1/jit-requests` | List JIT requests | Filter by `state`, `requester` |
 | `POST /v1/jit-requests` | Submit a request for access to a node | Requester is the authenticated caller, never a body field |
-| `GET /v1/jit-requests/{jitRequestId}` | Get one request | |
+| `GET /v1/jit-requests/{jitRequestId}` | Get one request, with the approval chain as it stood at submission | `request:approve` |
 | `POST /v1/jit-requests/{jitRequestId}/approve` | Approve the next level | Self-approval impossible; each approver acts at most once |
 | `POST /v1/jit-requests/{jitRequestId}/deny` | Deny a pending request (terminal) | The denier can never be the requester |
 | `POST /v1/jit-requests/{jitRequestId}/revoke` | Revoke an approved/active grant | Also tears down live sessions via a lock |
