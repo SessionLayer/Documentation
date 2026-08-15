@@ -42,9 +42,9 @@ high-cardinality, so they never appear as tags; they live on the trace instead. 
 
 | Meter | Type | Tags | What it measures |
 |---|---|---|---|
-| `sessionlayer.session.establishment` | timer | `outcome` (`allow`/`deny`/`error`/`cancelled`), `access_model` | Control-Plane-side session-establishment latency: the machine work of the authorize path (decision + session write + token mint). Human login time is deliberately excluded. The 250 ms p95 SLO (NFR-4) is pre-configured as a histogram SLO boundary. |
+| `sessionlayer.session.establishment` | timer | `outcome` (`allow`/`deny`/`error`/`cancelled`), `access_model` | Control-Plane-side session-establishment latency: the machine work of the authorize path (decision + session write + token mint). Human login time is deliberately excluded. The 250 ms p95 SLO is pre-configured as a histogram SLO boundary. |
 | `sessionlayer.cert.sign` | timer | `kind`, `outcome` | Certificate-signing latency (session inner certificate, gateway host certificate): the second machine leg of establishment. 100 ms SLO boundary. |
-| `sessionlayer.ca.signer` | counter | `kind`, `source` (`request`/`probe`), `outcome` (`available`/`unavailable`/`error`) | Session-CA signing availability (NFR-3). Compute the 99.9% availability over `source="request"`; the periodic probe baseline would otherwise mask partial degradation. |
+| `sessionlayer.ca.signer` | counter | `kind`, `source` (`request`/`probe`), `outcome` (`available`/`unavailable`/`error`) | Session-CA signing availability. Compute the 99.9% availability over `source="request"`; the periodic probe baseline would otherwise mask partial degradation. |
 | `sessionlayer.session.limit` | counter | `outcome` (`denied`), `access_model` | Session-limit denials at authorization. A spike means identities are hitting their concurrency cap. |
 | `sessionlayer.session.lease.reaped` | counter | none | Leaked concurrency leases released by the reaper sweep. Non-zero means Gateways are failing to report session end; investigate before trusting the concurrency count. |
 | `sessionlayer.session.lease.live` | gauge | none | Fleet-wide live (unreleased, unexpired) concurrency leases. |

@@ -1,7 +1,7 @@
 # The quickstart node: a real OpenSSH server on slim Debian 13, adapted from the
 # platform's canonical test node (testing/docker/sshd in the source tree).
 #
-# Cert auth model (Design §3): this sshd trusts ONLY the SessionLayer session CA
+# Cert auth model: this sshd trusts ONLY the SessionLayer session CA
 # via TrustedUserCAKeys. The entrypoint installs the CA public key from the
 # seed-written state volume. Login accounts `deploy` and `dba` are the
 # RBAC-resolved Linux principals.

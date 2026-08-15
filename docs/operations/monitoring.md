@@ -11,8 +11,8 @@ and dashboard.
 
 | SLO | Target | Why this number |
 |---|---|---|
-| Session-establishment latency (NFR-4) | p95 at or under 250 ms, excluding human OIDC time | the machine path, authorize, sign, connect, should be invisible next to typing a command |
-| Session-CA signing availability (NFR-3) | 99.9%, measured on real sign requests | the session CA gates every new session (existing ones continue); it is an availability peer of your database, and it fails closed |
+| Session-establishment latency | p95 at or under 250 ms, excluding human OIDC time | the machine path, authorize, sign, connect, should be invisible next to typing a command |
+| Session-CA signing availability | 99.9%, measured on real sign requests | the session CA gates every new session (existing ones continue); it is an availability peer of your database, and it fails closed |
 
 Both are measured from meters the Control Plane emits (Micrometer to
 `/actuator/prometheus`):

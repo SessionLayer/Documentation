@@ -128,14 +128,14 @@ Control Plane replica.
 
 | Symptom | Add a replica? |
 |---|---|
-| `sessionlayer_session_establishment_seconds` p95 above 250 ms with CPU saturated | Yes. The SLO (NFR-4) is set as a histogram boundary at 250 ms in `application.properties`. |
+| `sessionlayer_session_establishment_seconds` p95 above 250 ms with CPU saturated | Yes. The SLO is set as a histogram boundary at 250 ms in `application.properties`. |
 | R2DBC pool utilization pinned with pending acquires | Yes, if Postgres has connection headroom (see the pool math below). Otherwise raise `spring.r2dbc.pool.max-size` first. |
 | `sessionlayer.cert.sign` p95 above its 100 ms boundary | Yes if CPU-bound with the local backend. If the backend is Azure Key Vault or AWS KMS, the ceiling is that service's latency, not the replica count. |
 | Audit writes lagging | No. Every audit insert serializes on one cluster-wide Postgres advisory lock to keep the hash chain linear, so replicas add no audit-write throughput. |
 | Session-limit denials spiking (`sessionlayer.session.limit`) | No. That is policy working; check the cap, not the capacity. |
 
-The availability SLO (NFR-3, 99.9% on real session-CA sign requests, as
-encoded in `prometheus-slo-rules.yaml`) is a redundancy requirement rather
+The availability SLO (99.9% on real session-CA sign requests, as encoded
+in `prometheus-slo-rules.yaml`) is a redundancy requirement rather
 than a throughput one: the session CA gates every new session and fails
 closed, so run at least two replicas. The shipped manifest does, at 250m
 CPU and 512Mi memory requested, 1 CPU and 1Gi limited, with the heap at 75%
