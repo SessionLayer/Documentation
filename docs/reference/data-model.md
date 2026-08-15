@@ -77,7 +77,7 @@ table. Where the two differ, the API's set is the one a call must satisfy;
 | capability | element of every capability set | `shell`, `exec`, `sftp`, `scp`, `port_forward_local`, `port_forward_remote`, `agent_forward`, `x11` | `shell`,`exec` |
 | audit outcome | `audit_event.outcome` | `success`, `failure`, `denied`, `error` | none |
 | node status | `node.status` | `pending`, `active`, `quarantined`, `removed` | `pending` |
-| node health | `node.health` | `unknown`, `healthy`, `unhealthy`, `unreachable` | `unknown` |
+| node health | `node.health` (deprecated, see below) | `unknown`, `healthy`, `unhealthy`, `unreachable` | `unknown` |
 | WORM mode | `recording_ref.worm_mode` | `compliance`, `governance` | none (nullable) |
 | break-glass auth path | `breakglass_policy.auth_path` | `fido2`, `offline_code` | `fido2` |
 | break-glass review | `breakglass_activation.review_status` | `pending`, `reviewed` | `pending` |
@@ -255,7 +255,7 @@ RUNTIME (`runtime` schema, live operational state, no `origin`):
 
 | Table | Purpose |
 |---|---|
-| `runtime.node` | Live registration, resolved labels, health/status, owning-gateway pointer. |
+| `runtime.node` | Live registration, resolved labels, status. Its `health` and `owning_gateway` columns are deprecated and inert; the API derives both per request, from `runtime.presence` and `runtime.node_host_key`. |
 | `runtime.presence` | `node_id, owning_gateway, gateway_addr, nonce, nonce_id, last_seen`. |
 | `runtime.agent_identity` | Agent mTLS identity ref, `generation`, join method, status. |
 | `runtime.gateway_identity` | Gateway mTLS identity ref, `generation`, join method, status. |
@@ -269,6 +269,25 @@ RUNTIME (`runtime` schema, live operational state, no `origin`):
 | `runtime.otp` | OTP hash (never raw), identity, allowed principals, source-cidr, expiry, `used`. |
 | `runtime.idempotency_key` | (`V22`) The recorded response for one `Idempotency-Key`, scoped to `(principal, method, path)`; bounded by `expires_at`, swept periodically. |
 | `runtime.audit_event` | Actor, subject, action, outcome, UTC time, correlation id, `detail` (including config before/after). Append-only, zero FKs. |
+
+### Derived, not stored: node health and owner
+
+`runtime.node.health` and `runtime.node.owning_gateway` are columns that nothing reads and nothing
+writes. They were stamped once at registration (`unknown`, `NULL`) and updated by no code path, so
+the API reported every working node as `unknown` with no owner. Both values are now computed per
+request from the tables that actually carry the state:
+
+| Value | Derived from |
+|---|---|
+| `health` | `runtime.node_host_key` first: no anchor is `unhealthy`, because the Gateway never TOFUs and aborts every session to such a node. Otherwise `runtime.presence`, for an agent node: `healthy` on a fresh claim, `unreachable` once it goes stale, `unknown` when no Gateway has ever claimed it. An agentless node is always `unknown`. |
+| `owningGateway` | `runtime.presence.owning_gateway`, and only while that claim is fresh by the HA staleness window, which is the rule connect-time routing already applies, so the two cannot disagree. |
+
+The columns stay for now rather than being dropped, because this project's migrations expand before
+they contract and the previous release's binary still selects them ([Upgrades](../operations/upgrades.md)).
+`V32` restates both catalog comments as deprecated, so `\d+ runtime.node` in `psql` stops asserting
+a liveness story the code no longer implements. Read either column directly and you get a stale
+default, not an answer. [Nodes](../admin-guides/nodes.md) has the operator-facing meaning of each
+health value.
 
 ## Secrets-at-rest posture
 
@@ -497,9 +516,10 @@ No new table (the lock is the existing `runtime.access_lock`).
 
 ### Host addressing & node lifecycle (no migration)
 
-Uses only existing columns: `node.status` (`pending`/`active`/`quarantined`/`removed`), `node.health`,
+Uses only existing columns: `node.status` (`pending`/`active`/`quarantined`/`removed`),
 `status_reason`/`status_changed_by`/`status_changed_at`, `node_host_key`, `access_lock`, and the
-`agent_identity` generation guard.
+`agent_identity` generation guard. Node health is not among them: it is derived at read time
+(below), not stored.
 
 - Name→id resolution: `AuthorizeRequest.node_name` resolves to `runtime.node.id` via
   `NodeRepository.findByName`, server-side and authoritative; a client-supplied `node_id` is ignored
