@@ -4,15 +4,25 @@ You connect to nodes through SessionLayer with the stock OpenSSH client you
 already have: `ssh`, `sftp`, `scp`, `~/.ssh/config`, `ProxyJump`, and
 connection multiplexing all work. This page shows the three ways to address
 a node, what the authentication prompts look like, and what to expect when
-access is refused. Every command here runs against the
-[quickstart](../getting-started/quickstart.md) stack.
+access is refused.
 
 ## Prerequisites
 
-- [ ] The quickstart stack is running and you completed it (your client
-      container has a pinned key for `alice@example.com`).
-- [ ] Commands run from the `examples/quickstart` directory; `curl` and `jq`
-      for the OTP section.
+- [ ] An identity that can authenticate to a Gateway, and at least one node
+      you are granted access to. If you are evaluating, that is what the
+      [quickstart](../getting-started/quickstart.md) leaves you with.
+- [ ] Your operator's Gateway address, its SSH port, and its host key or
+      fingerprint.
+- [ ] `curl` and `jq` for the OTP section, which is an admin's job.
+
+> **Note:** the runnable blocks on this page target the
+> [quickstart](../getting-started/quickstart.md) stack, so they are prefixed
+> with `docker compose exec -T client`. Against a real deployment, drop that
+> prefix and run the `ssh`/`sftp`/`curl` yourself: substitute your Gateway's
+> address for `gateway`, its SSH port for `2222`, and your Control Plane URL
+> for `http://127.0.0.1:8080`. The commands are otherwise identical, because
+> the client is stock OpenSSH either way.
+
 
 ## How addressing works
 

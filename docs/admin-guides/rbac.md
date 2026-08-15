@@ -157,6 +157,10 @@ curl -s https://cp.example.com/v1/rules \
   }'
 ```
 
+`ttlSeconds` is required on every rule, including a deny, and is `1` above
+because a deny has no grant to time-box: nothing reads it. Omitting it is a
+`400` whose body names no field, so send the minimum and move on.
+
 A contractor who is also in `developers` and covered by ten allow rules is
 still denied on every `env=prod` node: one matching deny beats all allows,
 in any order. Use explicit deny rules for durable policy ("contractors never

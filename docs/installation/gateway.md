@@ -382,13 +382,44 @@ header from the LB is rejected too: fail closed both ways.
 
 ## Verify
 
+Enrollment is the step that can silently not have happened, so check it
+first. The Gateway logs the moment it has an identity and is listening:
+
+```bash
+docker logs sessionlayer-gateway 2>&1 | grep "outer SSH leg listening"
+```
+
+```text
+2026-08-15T20:03:35.772250Z  INFO outer SSH leg listening addr=0.0.0.0:2222
+```
+
+No such line means it never got that far: read the log from the top. A
+`UNAUTHENTICATED` in a restart loop means the enrollment token was already
+spent, and the fix is a fresh one rather than a retry.
+
+Then confirm the Control Plane agrees, which is the half the Gateway's own
+log cannot tell you (`gateway:enroll`):
+
+```bash
+curl -s -G https://cp.example.com/v1/gateways \
+  -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode "name=gw-1" | jq '.items[] | {name, status, fingerprintSha256}'
+```
+
+A row with your Gateway's name is an enrolled, lockable principal. An empty
+`items` list means the Gateway is running on compiled-in defaults and has not
+enrolled at all.
+
+Only then is the SSH front door worth testing:
+
 ```bash
 ssh -p 2222 'deploy%web-01'@gw.example.com
 # expect: a generic authentication failure. No access rules exist yet, so
 # every credential is refused (denials are deliberately uninformative).
 ```
 
-That is the platform working, not a misconfiguration. Continue with
+That refusal is the platform working, not a misconfiguration: it proves the
+listener is up and the policy path is default-deny. Continue with
 [node enrollment](../admin-guides/nodes.md) and [RBAC](../admin-guides/rbac.md),
 then connect for real.
 

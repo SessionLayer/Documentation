@@ -8,10 +8,22 @@ on the quickstart stack.
 
 ## Prerequisites
 
-- [ ] The [quickstart](../getting-started/quickstart.md) stack is running and
-      you completed it in your current shell (it set `$NODE_ID`; this page
-      re-mints `$TOKEN` below).
-- [ ] `curl` and `jq` on your machine.
+- [ ] An identity that can authenticate to the Control Plane's API, and a
+      node id to request against.
+- [ ] `curl` and `jq`.
+- [ ] For the worked example below: the
+      [quickstart](../getting-started/quickstart.md) stack, completed in your
+      current shell (it set `$NODE_ID`; this page re-mints `$TOKEN`). The
+      admin half of the example is your operator's job in a real deployment.
+
+> **Note:** the runnable blocks on this page target the
+> [quickstart](../getting-started/quickstart.md) stack, so they are prefixed
+> with `docker compose exec -T client`. Against a real deployment, drop that
+> prefix and run the `ssh`/`sftp`/`curl` yourself: substitute your Gateway's
+> address for `gateway`, its SSH port for `2222`, and your Control Plane URL
+> for `http://127.0.0.1:8080`. The commands are otherwise identical, because
+> the client is stock OpenSSH either way.
+
 
 > **Note:** the `accept-new` in these evaluation blocks is fine against the
 > throwaway loopback stack; production clients pre-provision the Gateway's

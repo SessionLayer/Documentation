@@ -7,6 +7,7 @@ and span the components emit, derived from the observability contract and the so
 The split by component:
 
 - The Control Plane exposes Micrometer meters at `/actuator/prometheus` and can export OTLP traces.
+  That endpoint requires authentication: an unauthenticated scrape gets `401`.
 - The Gateway and Agent emit OTLP traces only. The [Tier-0](glossary.md) data plane deliberately
   carries no metrics pipeline; their rate/error/duration metrics are derived centrally from spans by
   an OpenTelemetry Collector (below).
@@ -15,9 +16,23 @@ The split by component:
 
 | Component | Metrics | Traces |
 |---|---|---|
-| Control Plane | `/actuator/prometheus` (exposed by default alongside `health`, `info`, `metrics`) | OTLP, off by default; enable by setting both `management.otlp.tracing.export.enabled=true` and `management.otlp.tracing.endpoint` (service name via `management.opentelemetry.resource-attributes.service.name`, default `sessionlayer-controlplane`; sampling via `management.tracing.sampling.probability`) |
+| Control Plane | `/actuator/prometheus`, authenticated (see below) | OTLP, off by default; enable by setting both `management.otlp.tracing.export.enabled=true` and `management.otlp.tracing.endpoint` (service name via `management.opentelemetry.resource-attributes.service.name`, default `sessionlayer-controlplane`; sampling via `management.tracing.sampling.probability`) |
 | Gateway | none (span-derived) | OTLP, on only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; service name `sessionlayer-gateway` (`OTEL_SERVICE_NAME` overrides) |
 | Agent | none (span-derived) | Same convention; service name `sessionlayer-agent` |
+
+### Scraping the Control Plane
+
+`/actuator/prometheus` is not a public endpoint. An unauthenticated scrape gets `401`, and so does
+`/actuator/metrics`. Only `/v1/healthz`, `/v1/version`, `/actuator/health` (including
+`/actuator/health/readiness`) and `/actuator/info` are reachable without a credential, which is
+what load-balancer and orchestrator probes need.
+
+Give Prometheus a credential of its own: create a service account, issue it a `client_secret` or
+`private_key_jwt` credential, and have your scrape config exchange it at `POST /v1/oauth2/token`
+for a bearer token ([Authentication](../admin-guides/authentication.md)). No platform permission
+gates this endpoint today: any authenticated principal can read the meters, including a service
+account with no role bindings at all. Bind that account no roles, and reach the endpoint over your
+internal network rather than through the public ingress.
 
 ## Names as exported
 

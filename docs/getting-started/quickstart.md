@@ -13,9 +13,10 @@ OpenSSH, and the platform's real REST API for every step.
 
 ## Prerequisites
 
-- [ ] Docker Engine and the `docker compose` plugin, v2.24 or newer (the stack
-      uses `additional_contexts`, added in v2.24). Tested with Docker 29 and
-      Compose v5.3. Check with `docker compose version`. On x86_64 or aarch64
+- [ ] Docker Engine and the `docker compose` plugin. Check with
+      `docker compose version`. Tested on Docker 29 with Compose v5.3 and
+      v5.4; the stack uses `--wait` and `service_completed_successfully`,
+      so a v2 plugin older than 2.17 will not run it. On x86_64 or aarch64
       Linux; macOS with Docker Desktop is expected to work but is untested.
 - [ ] `curl` and `jq`.
 - [ ] About 10 GB of free disk during the first build and 4 GB of free RAM;
@@ -24,7 +25,7 @@ OpenSSH, and the platform's real REST API for every step.
       earlier ones.
 
 > **Note:** the first `docker compose up` installs the Control Plane and the
-> Gateway from their real, signed `v0.0.1` GitHub Releases, the same install
+> Gateway from their real, signed `v0.0.2` GitHub Releases, the same install
 > path a production node uses. Each image's build downloads the release
 > artifact plus its keyless cosign Sigstore bundle and verifies the signature
 > against the exact release-workflow identity before the artifact ever runs;

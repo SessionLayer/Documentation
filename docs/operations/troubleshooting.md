@@ -19,6 +19,30 @@ The error taxonomy in one table:
 | `session cannot start: recording unavailable` | strict recording (always, for break-glass) could not start | specific |
 | `service temporarily unavailable` | Control Plane unreachable, new sessions fail closed | specific |
 
+Everything above is a running platform. If you are still installing one, start
+with the section below instead.
+
+## Install-time failures
+
+These land before any session exists, so none of the audit machinery above
+applies yet. The log of the component that refused is the whole diagnosis.
+
+| What you see | Where | What it is |
+|---|---|---|
+| `denied` or `unauthorized` from `docker pull ghcr.io/sessionlayer/…` | your shell | The packages are private. Build from source instead; every install page has the commands ([Install the Control Plane](../installation/control-plane.md)) |
+| `$DIGEST` empty, then `manifest unknown` or a chart installing the wrong image | your shell, then the cluster | Same cause: `docker buildx imagetools inspect` could not reach the manifest. Do not deploy a tag as a fallback; build, push to your own registry, and pin that digest |
+| `Error: parsing gateway config <path>: key must be a string` | Gateway, at startup | `gateway.json` is not strict JSON. A `//` comment or a trailing comma does this, and it lands before any hardening applies ([Install the Gateway](../installation/gateway.md)) |
+| `UNAUTHENTICATED` on the Gateway, in a restart loop | Gateway | The enrollment token was already spent. It is single-use: mint a fresh one. Running two Gateway replicas from one release does this to all but the first |
+| The Control Plane exits at startup naming `sessionlayer.ca.local.kek-base64` | Control Plane | No key-encryption key. This is a refusal, not a crash: set a real KEK. Never reach for `allow-dev-kek` to get past it ([Production hardening](../security/hardening.md)) |
+| Flyway fails and the Control Plane never becomes ready | Control Plane | Check the owner-role credentials first (`spring.flyway.*`, distinct from `spring.r2dbc.*`). A readiness probe that never passes during a first boot is usually a startup budget too short for CA cold start, not a migration fault |
+| `Bad owner or permissions on ~/.ssh/config` | your SSH client | `~/.ssh` must be `0700` and the config `0600`. Nothing to do with the platform ([SSH access](../user-guide/ssh-access.md)) |
+| `401` scraping `/actuator/prometheus` | Prometheus | That endpoint is authenticated. Only `/v1/healthz`, `/v1/version`, `/actuator/health` and `/actuator/info` are public ([Metrics](../reference/metrics.md)) |
+| `{"status":400,"error":"Bad Request"}` with no `title` or `detail` | any API call | Schema validation rejected the body or a required query parameter before it reached a handler, so nothing names the field. Re-read the operation's required set in the [API reference](../reference/api.md) |
+| A cosign verification failure during an image build | your build | Correct behaviour: the build refuses an artifact it cannot verify, and there is no fallback to an unverified one. Check the tag exists and that you are on cosign v3.0.4 or newer ([Supply chain](../security/supply-chain.md)) |
+
+> **Note:** a `docker compose up` that fails once with `No such image` on a
+> clean machine is a pull race, not a configuration error. Run it again.
+
 ## Connection dropped before any SSH banner
 
 No banner means the TCP connection was cut at accept, before SSH existed.

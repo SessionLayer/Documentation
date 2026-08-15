@@ -3,7 +3,7 @@
 # Everything runs in containers on one Compose network: Postgres, MinIO (the WORM
 # recording store), the Control Plane, the Gateway, one node, and a stock OpenSSH
 # client so the guide never touches your host SSH setup. The Control Plane and
-# Gateway are installed from the real, signed v0.0.1 GitHub Releases (verified
+# Gateway are installed from the real, signed v0.0.2 GitHub Releases (verified
 # with cosign at image-build time — see cp.Dockerfile/gateway.Dockerfile and
 # docs/security/supply-chain.md), not built from source, so you only clone the
 # Documentation repository.
@@ -53,12 +53,12 @@ services:
     build:
       context: .
       dockerfile: cp.Dockerfile
-      # The real, signed v0.0.1 release — cosign-verified at build time in
+      # The real, signed v0.0.2 release — cosign-verified at build time in
       # cp.Dockerfile's fetch stage (docs/security/supply-chain.md). Override
       # with --build-arg CP_TAG=/CP_JAR_VERSION= to track a later release.
       args:
-        CP_TAG: "0.0.1"
-        CP_JAR_VERSION: "0.0.1"
+        CP_TAG: "0.0.2"
+        CP_JAR_VERSION: "0.0.2"
     environment:
       SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/sessionlayer
       SPRING_R2DBC_USERNAME: sessionlayer
@@ -105,11 +105,11 @@ services:
     build:
       context: .
       dockerfile: gateway.Dockerfile
-      # The real, signed v0.0.1 release — cosign-verified at build time in
+      # The real, signed v0.0.2 release — cosign-verified at build time in
       # gateway.Dockerfile's fetch stage. Override with --build-arg GW_TAG= to
       # track a later release.
       args:
-        GW_TAG: "0.0.1"
+        GW_TAG: "0.0.2"
     command: ["--config", "/state/gateway.json"]
     hostname: gw
     ports:

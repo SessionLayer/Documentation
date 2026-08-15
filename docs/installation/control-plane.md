@@ -406,7 +406,11 @@ curl -s https://cp.example.com/v1/bootstrap/claim \
 > authenticate as, and the bootstrap self-disables behind you.
 
 Now create a service account and issue it a credential, authenticating with
-Basic:
+Basic. `-u installer` carries no password, so `curl` prompts for it on the
+terminal; inside a command substitution the prompt still appears, but a
+non-interactive paste of the whole block hangs waiting for it. Type the
+password when asked, or use `-u installer:$PASSWORD` if you accept it landing
+in your shell history:
 
 ```bash
 SA_ID=$(curl -s -u installer https://cp.example.com/v1/service-accounts \
