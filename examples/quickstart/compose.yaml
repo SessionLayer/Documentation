@@ -71,11 +71,9 @@ services:
       retries: 60
       start_period: 90s
 
-  # One-shot provisioning that has no public API surface: extracts the CA
-  # trust anchors, mints the Gateway's enrollment token, creates the admin
-  # service account, and installs the customer recording key (public half only).
-  # Everything else in the guide uses the real REST API. Idempotent across
-  # re-runs of `docker compose up`.
+  # One-shot provisioning written straight to the database so the guide can start
+  # at the interesting part; every item it seeds has a REST API a real install uses
+  # instead (see seed/seed.sh). Idempotent across re-runs of `docker compose up`.
   seed:
     build: ./seed
     volumes:

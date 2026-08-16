@@ -8,6 +8,5 @@
     "MD036": false
   },
   "globs": ["**/*.md"],
-  // product/ is where CI checks out the source-of-truth repos for the drift gates.
   "ignores": ["node_modules/**", "product/**"]
 }
