@@ -177,7 +177,11 @@ hard-kill), an idle timeout (`idle_timeout`, activity-tracked, per
 deadline during maintenance ([Upgrades](upgrades.md)), or a mid-session
 recording failure under strict mode.
 
-The `endReason` vocabulary is closed:
+These are the values the Control Plane writes. Nothing constrains the column
+to them: there is no `CHECK` and no enum in the API contract, deliberately, so
+that a session-end write can never fail on a value the schema did not
+anticipate. Treat the list as the set to expect, not as one the database
+enforces:
 
 | `endReason` | Means |
 |---|---|
@@ -191,7 +195,8 @@ The `endReason` vocabulary is closed:
 
 It is advisory. The authoritative "why" for a teardown is the lock or
 decision entry in the audit chain, not this field: a drain and a clean
-logout are both `closed`.
+logout are both `closed`, and a Gateway that refused a session the Control
+Plane had already allowed lands in `error`.
 
 ## A channel is refused inside a working session
 
