@@ -7,6 +7,7 @@ and span the components emit, derived from the observability contract and the so
 The split by component:
 
 - The Control Plane exposes Micrometer meters at `/actuator/prometheus` and can export OTLP traces.
+  That endpoint requires the `metrics:read` permission; an unauthenticated scrape gets `401`.
 - The Gateway and Agent emit OTLP traces only. The [Tier-0](glossary.md) data plane deliberately
   carries no metrics pipeline; their rate/error/duration metrics are derived centrally from spans by
   an OpenTelemetry Collector (below).
@@ -15,9 +16,58 @@ The split by component:
 
 | Component | Metrics | Traces |
 |---|---|---|
-| Control Plane | `/actuator/prometheus` (exposed by default alongside `health`, `info`, `metrics`) | OTLP, off by default; enable by setting both `management.otlp.tracing.export.enabled=true` and `management.otlp.tracing.endpoint` (service name via `management.opentelemetry.resource-attributes.service.name`, default `sessionlayer-controlplane`; sampling via `management.tracing.sampling.probability`) |
+| Control Plane | `/actuator/prometheus`, gated on `metrics:read` (see below) | OTLP, off by default; enable by setting both `management.otlp.tracing.export.enabled=true` and `management.otlp.tracing.endpoint` (service name via `management.opentelemetry.resource-attributes.service.name`, default `sessionlayer-controlplane`; sampling via `management.tracing.sampling.probability`) |
 | Gateway | none (span-derived) | OTLP, on only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; service name `sessionlayer-gateway` (`OTEL_SERVICE_NAME` overrides) |
 | Agent | none (span-derived) | Same convention; service name `sessionlayer-agent` |
+
+### Scraping the Control Plane
+
+`/actuator/prometheus` and `/actuator/metrics`, and everything under them, require the
+`metrics:read` platform permission; an unauthenticated request to either gets `401`. Both are
+gated because the same meters are published over both routes, so gating one alone would close
+nothing. Only `/v1/healthz`, `/v1/version`, `/actuator/health` (including
+`/actuator/health/readiness`) and `/actuator/info` are reachable without a credential, which is
+what Kubernetes probes and load-balancer health checks need, so those are unaffected.
+
+`metrics:read` cannot be scoped. The meter set is a fleet-wide aggregate with no per-node or
+per-user dimension to narrow, so a scope could only be a no-op or serve a silently partial set,
+and a scraper that receives incomplete metrics without knowing it builds confident wrong
+dashboards.
+
+Give Prometheus a machine identity of its own: a service account bound to a role carrying
+`metrics:read` and nothing else, with a `client_secret` or `private_key_jwt` credential
+([Authentication](../admin-guides/authentication.md)). Prometheus exchanges it at
+`POST /v1/oauth2/token` itself, using its native `oauth2` block, so no token file goes stale:
+
+```yaml
+scrape_configs:
+  - job_name: sessionlayer-controlplane
+    metrics_path: /actuator/prometheus
+    scheme: https
+    static_configs:
+      - targets: ["cp.example.com:443"]
+    oauth2:
+      client_id: prometheus-scraper
+      client_secret_file: /etc/prometheus/sessionlayer-client-secret
+      token_url: https://cp.example.com/v1/oauth2/token
+```
+
+> **Warning:** bind that account `metrics:read` alone. The vocabulary grew a twenty-first
+> permission rather than reusing `audit:read` for exactly this reason: a scraper holding
+> `audit:read` could read the entire audit trail, which is a worse exposure than the one the
+> gate closes. Scrape over your internal network rather than through the public ingress.
+
+Every scrape is an authorization decision, and this platform audits authorization decisions. A
+scraper on a 15-second interval therefore writes about **5,760 `platform.authz` rows a day**, and
+a second scraper doubles it. That is deliberate: an authorization decision the platform made and
+did not record would be the one gap in a claim the rest of the product keeps. It is a
+signal-dilution question rather than a performance one, at roughly 0.067 writes a second against
+a chain that carries session traffic.
+
+Plan for it in two places. Size audit retention with the scrape rate included, and know the
+filter: these rows carry `action=platform.authz` and, because a permission check records the
+permission as its subject, `subject=metrics:read`. Isolating or excluding them is one query
+parameter ([Audit](../admin-guides/audit.md)).
 
 ## Names as exported
 

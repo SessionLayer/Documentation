@@ -1,10 +1,9 @@
 # Production hardening
 
-SessionLayer's production sign-off is explicitly production-grade under the
-operator preconditions, and this page is those preconditions: an ordered
-checklist with commands. Work through it top to bottom before the platform
-carries real access. Every item here exists because skipping it reopens a
-documented risk.
+This page is the set of operator preconditions the platform assumes: an
+ordered checklist with commands. Work through it top to bottom before the
+platform carries real access. Every item here exists because skipping it
+reopens a risk named in the [trust model](trust-model.md).
 
 The quick self-audit:
 
@@ -13,7 +12,8 @@ The quick self-audit:
 - [ ] 2. Real `cp_runtime` DB password; restricted role verified; Postgres HA
       with synchronous replication for authz/audit
 - [ ] 3. A real generated KEK protecting every CA still on `local` (never the
-      dev default); SSH CAs optionally adopted onto `azure_keyvault`
+      dev default); SSH CAs optionally adopted onto `azure_keyvault` or
+      `aws_kms`
 - [ ] 4. Customer recording key provisioned; private half offline
 - [ ] 5. WORM mode chosen deliberately; audit forwarded off-box to a SIEM
 - [ ] 6. A session-limit cluster default set (the shipped default is
@@ -333,22 +333,34 @@ sessionlayer.session-limits.default-idle-timeout-seconds=1800
 
 The Gateway is Tier-0, the only place session plaintext exists. Run it with
 the full in-process profile (privilege drop after binding `:22`, seccomp
-enforce, Landlock, coredumps off):
+enforce, Landlock, coredumps off). Add `hardening` as a top-level key of the
+`/etc/sessionlayer/gateway.json` you wrote in
+[Install the Gateway](../installation/gateway.md):
 
-```jsonc
-// /etc/sessionlayer/gateway.json: the hardening block
-"hardening": {
-  "run_as_user": "sessionlayer",          // bare-metal: drop after bind; container: starts non-root
-  "landlock": {
-    "enabled": true,
-    "read_only_paths": ["/etc/sessionlayer", "/etc/ssl/certs", "/etc/resolv.conf",
-                        "/etc/hosts", "/etc/nsswitch.conf", "/lib", "/lib64", "/usr/lib",
-                        "/dev", "/proc"],
-    "read_write_paths": ["/var/lib/sessionlayer-gateway"]
-  },
-  "seccomp": { "mode": "enforce" }
+```json
+{
+  "hardening": {
+    "run_as_user": "sessionlayer",
+    "landlock": {
+      "enabled": true,
+      "read_only_paths": ["/etc/sessionlayer", "/etc/ssl/certs", "/etc/resolv.conf",
+                          "/etc/hosts", "/etc/nsswitch.conf", "/lib", "/lib64", "/usr/lib",
+                          "/dev", "/proc"],
+      "read_write_paths": ["/var/lib/sessionlayer-gateway"]
+    },
+    "seccomp": { "mode": "enforce" }
+  }
 }
 ```
+
+> **Warning:** the Gateway parses this file as strict JSON. A `//` comment, a
+> trailing comma, or a fragment pasted without its enclosing braces fails
+> startup with `Error: parsing gateway config <path>: key must be a string`,
+> before any hardening is applied. Merge the key above into your existing
+> object rather than pasting the block on its own.
+
+`run_as_user` drops privilege after the bind on bare metal and does nothing in
+the container image, which already starts non-root.
 
 Roll seccomp out as `off → log → enforce`: in `log` mode, run a full
 shell/exec/SFTP session and confirm `dmesg`/auditd shows no unexpected
@@ -367,7 +379,7 @@ gRPC port, your node subnet on 22, and the WORM store) after scoping its
 CIDRs to your fleet:
 
 ```bash
-kubectl apply -f Gateway/deploy/kubernetes/networkpolicy.yaml
+kubectl apply -f deploy/kubernetes/networkpolicy.yaml
 ```
 
 The Gateway chart renders the same policy, on by default, from

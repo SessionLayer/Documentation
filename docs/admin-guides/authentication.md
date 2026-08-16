@@ -84,15 +84,50 @@ Pins are an authentication shortcut only:
 
 Admins can list and revoke pins, and pins are revoked automatically on
 offboarding, on a lock, and on OIDC back-channel logout where the IdP
-supports it:
+supports it.
+
+List every live pin, or narrow to one identity with the optional `identity`
+parameter. Both calls need `user:manage`:
 
 ```bash
-curl -s https://cp.example.com/v1/pins -H "Authorization: Bearer $TOKEN"
+curl -s https://cp.example.com/v1/pins \
+  -H "Authorization: Bearer $TOKEN" | jq '.pins[] | {id, identity, fingerprint, principals, expiresAt}'
 
+# or one person's:
+curl -s -G https://cp.example.com/v1/pins \
+  -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode "identity=alice@example.com" | jq '.pins[] | {id, fingerprint, principals, expiresAt}'
+```
+
+```json
+{
+  "id": "01a00706-7066-7c44-bedc-60d5b9a0b3f7",
+  "identity": "alice@example.com",
+  "fingerprint": "SHA256:vksMx43C7+OSA/Dl6FUMVuJm46mwAEMoKQgwJb5HR2U",
+  "principals": ["deploy", "dba"],
+  "expiresAt": "2026-08-15T21:04:17.637795Z"
+}
+```
+
+```bash
 # PIN_ID is the id of the pin to revoke, from the list above.
 curl -s -X DELETE https://cp.example.com/v1/pins/$PIN_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+The unfiltered form is the one offboarding and incident review need, because
+the question there is "who still holds a pin", which you cannot ask if you
+have to name the person first. A pin authenticates on its own and outlives the
+session it was created for, so a pin nobody has accounted for is standing
+access: revoking an identity means revoking its pins, not only ending its
+sessions.
+
+> **Note:** enumeration is not withheld as a control here, and treating it as
+> one would protect nothing. `user:manage` is the permission that *mints*
+> pins as well as lists them, so a principal who could not enumerate them
+> could still create them. `pin.create` in the [audit stream](audit.md) is a
+> change record rather than an inventory, and it is bounded by audit
+> retention. A credential type you cannot inventory is one you cannot audit.
 
 ## Pre-issued OTPs
 

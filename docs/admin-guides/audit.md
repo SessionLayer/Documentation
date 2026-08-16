@@ -21,10 +21,10 @@ dimensions cover everything an investigation pivots on: identity, target,
 node and node label, session, source IP, capability, access model, and time:
 
 ```bash
-# Everything alice did on prod web nodes last week:
+# Every authorization decision about alice on prod web nodes last week:
 curl -s -G https://cp.example.com/v1/audit-events \
   -H "Authorization: Bearer $TOKEN" \
-  --data-urlencode "actor=alice@example.com" \
+  --data-urlencode "subject=alice@example.com" \
   --data-urlencode "nodeLabel=env=prod" \
   --data-urlencode "nodeLabel=role=web" \
   --data-urlencode "from=2026-07-13T00:00:00Z" \
@@ -42,11 +42,54 @@ curl -s -G https://cp.example.com/v1/audit-events \
   --data-urlencode "action=lock.create"
 ```
 
+### `actor` and `subject` are not the same person
+
+`actor` is who made the call. `subject` is who it was about. A session splits
+across both, because the Gateway acts on the user's behalf: `authz.decision`
+and `session.end` carry the Gateway's enrolled identity as `actor` and the
+human as `subject`, while `recording.begin`/`upload`/`finalize` and the
+`sftp.*` operations carry the human as `actor` and no subject.
+
+One session by `alice@example.com`, filtered each way:
+
+| Filter | What comes back |
+|---|---|
+| `subject=alice@example.com` | `authz.decision`, `session.end`, `otp.issue`, `pin.create` |
+| `actor=alice@example.com` | `pin.resolve`, `recording.begin`, `recording.upload`, `recording.finalize`, `sftp.read`, `sftp.write` |
+
+The two sets do not overlap, so neither filter alone answers "everything alice
+did". Use `subject` for "what was decided about this person", `actor` for "what
+this person or component performed", and `correlationId` (below) when you want
+one session whole.
+
+`subject` is not always a person. On `platform.authz` events, which record every
+admin permission check, the actor is the caller and the **subject is the
+permission** that was checked, so `subject=metrics:read` returns every decision
+about that permission rather than every decision about somebody named
+`metrics:read`. That is what makes an admin surface searchable by the authority
+being exercised. Both filters match exactly and neither is validated, so a
+wrong guess returns an empty page rather than an error, which reads exactly like
+an event that was never recorded.
+
 The `authz.decision` events in this stream are what other pages call the
 decision log: the operator-side truth behind every generic
 `access denied by policy`, carrying the matched rule or lock and the full
 allow snapshot. It is not a separate store or file: search it with
 `--data-urlencode "action=authz.decision"` like any other filter.
+
+A refusal because the presented credential is not scoped to the login asked
+for lands here too, as an `authz.decision` with outcome `denied`, `reason`
+`PRINCIPAL_NOT_ALLOWED` and `note` `credential_principal_scope` in its
+`detail`. It is worth knowing that this one is in the stream at all: the
+reduction is applied deny-only before grants, JIT and break-glass, and the
+user sees the same generic denial as always, so the decision log is the only
+place the specific cause appears.
+
+A Gateway can also refuse this locally *after* the Control Plane allowed,
+which is an anomaly rather than the ordinary path and leaves no denial here to
+find. It shows as a succeeded `authz.decision` followed by a `session.end`
+with `endReason` `error` and no `recording.begin` in between. The
+[Gateway runbook](../operations/gateway-runbook.md) covers when that happens.
 
 `nodeLabel` is repeatable and ANDed. Un-time-bounded searches default to the
 last 90 days; a window wider than 366 days is rejected (`422`) rather than
@@ -166,6 +209,13 @@ curl -s -X PUT https://cp.example.com/v1/operator-settings \
         | .auditRetentionDays = 400
         | .recordingRetentionDays = 400')"
 ```
+
+Size these with your `platform.authz` volume included, not just your session
+volume. Every admin permission check writes a row, and an authenticated
+Prometheus scraper is the one that dominates: a 15-second scrape interval is
+about 5,760 rows a day, per scraper ([Metrics](../reference/metrics.md)). They
+filter out on `subject=metrics:read` when you are searching, but they still
+occupy the window you are paying to keep.
 
 Keep both at or above 12 months for PCI/SOC 2/ISO-style regimes. Either
 value can be raised or left alone; lowering one is a `422` at every

@@ -13,8 +13,8 @@
 # the jar from the pom, so an unbumped pom would silently ship a filename
 # that disagrees with the tag.
 FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS fetch
-ARG CP_TAG=0.0.1
-ARG CP_JAR_VERSION=0.0.1
+ARG CP_TAG=0.0.2
+ARG CP_JAR_VERSION=0.0.2
 ARG CP_REPO=SessionLayer/ControlPlane
 ARG COSIGN_VERSION=v3.1.2
 # cosign's own checksum (not just TLS-to-github.com) roots the whole
@@ -34,7 +34,7 @@ RUN curl -fsSLO "https://github.com/${CP_REPO}/releases/download/v${CP_TAG}/cont
       --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 
 FROM eclipse-temurin:25-jre@sha256:681c543d6f36c50f45e9b5226930a46203dcfa351d3670e9d0bdf0dabae53539
-ARG CP_JAR_VERSION=0.0.1
+ARG CP_JAR_VERSION=0.0.2
 # curl is only for the compose healthcheck.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \

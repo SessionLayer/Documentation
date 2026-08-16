@@ -36,8 +36,8 @@ Three mechanisms, deliberately non-overlapping:
   session by the owner, to the ingress address carried in the signal. No standing mesh, no
   service discovery.
 
-> **Note:** session bytes never traverse the coordination bus. This is a
-> tested invariant, not an intention. The bus carries routing signals; the
+> **Note:** session bytes never traverse the coordination bus. The bus
+> carries routing signals only; the
 > bytes flow client → ingress Gateway → owner Gateway → node, directly. The
 > ingress Gateway stays the session's recorder, and the client is never
 > redirected.
@@ -64,8 +64,8 @@ refuses what it cannot verify.
 
 Losing one instance:
 
-- *does not* drop sessions running on surviving instances: proven by a
-  hard-kill test that keeps passing new bytes on a survivor mid-kill;
+- *does not* drop sessions running on surviving instances: a session whose
+  bytes never touched the lost instance keeps flowing;
 - *does* terminate, fail-closed, any session whose bytes physically
   transited the killed instance: there is no live SSH session migration and
   no cross-instance session-state replication, in SessionLayer or anywhere

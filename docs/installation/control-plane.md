@@ -32,6 +32,15 @@ provision either way.
 
 ## Get it
 
+> **Warning:** the `ghcr.io/sessionlayer/*` packages are private. An
+> unauthenticated `docker pull` fails, and so does everything downstream
+> of it: `docker buildx imagetools inspect` cannot resolve a digest,
+> `cosign verify` and `gh attestation verify` cannot reach the manifest,
+> and any `--set image.digest="$DIGEST"` gets an empty variable. Until the
+> packages are made public, building the image or the jar from source
+> (below) is the path that works. The commands below are correct and are
+> what to run once you have registry access.
+
 ```bash
 docker pull ghcr.io/sessionlayer/controlplane:v0.0.2
 ```
@@ -397,7 +406,11 @@ curl -s https://cp.example.com/v1/bootstrap/claim \
 > authenticate as, and the bootstrap self-disables behind you.
 
 Now create a service account and issue it a credential, authenticating with
-Basic:
+Basic. `-u installer` carries no password, so `curl` prompts for it on the
+terminal; inside a command substitution the prompt still appears, but a
+non-interactive paste of the whole block hangs waiting for it. Type the
+password when asked, or use `-u installer:$PASSWORD` if you accept it landing
+in your shell history:
 
 ```bash
 SA_ID=$(curl -s -u installer https://cp.example.com/v1/service-accounts \
@@ -539,18 +552,39 @@ at boot).
 
 ## Verify
 
+All three of these are public, so they work before any admin exists:
+
 ```bash
 curl -s http://localhost:8080/v1/healthz
 curl -s http://localhost:8080/v1/version
 curl -s http://localhost:8080/actuator/health/readiness
 ```
 
-Expect a healthy status from the readiness check and a real version string
-from `/v1/version`. Confirm the gRPC plane is listening too:
+```text
+{"status":"pass"}
+{"component":"SessionLayer Control Plane","version":"0.0.2","protocols":{"controlPlaneGatewayGrpc":{"min":"1.0","max":"1.1"},"agentGatewayWire":{"min":"1.0","max":"1.0"}}}
+{"status":"UP"}
+```
+
+`readiness` reporting `UP` is the load-bearing one: it does not report ready
+until Flyway and both startup runners (CA provisioning, first-admin bootstrap)
+have finished, so a `DOWN` here during a first boot usually means migrations
+are still running rather than that something failed. Give it the full startup
+budget before investigating.
+
+Confirm the gRPC plane is listening too:
 
 ```bash
 nc -zv localhost 9443
 ```
+
+```text
+Connection to localhost (127.0.0.1) 9443 port [tcp/*] succeeded!
+```
+
+A refused connection here with a healthy REST surface is the port mismatch
+described above: the built-in default is `9090` and nothing in the image moves
+it.
 
 ## Next
 

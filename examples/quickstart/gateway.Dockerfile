@@ -6,7 +6,7 @@
 # release-workflow identity, and only then run it. A verification failure
 # fails the image build.
 FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS fetch
-ARG GW_TAG=0.0.1
+ARG GW_TAG=0.0.2
 ARG GW_REPO=SessionLayer/Gateway
 ARG COSIGN_VERSION=v3.1.2
 # cosign's own checksum (not just TLS-to-github.com) roots the whole

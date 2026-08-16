@@ -4,15 +4,24 @@ You connect to nodes through SessionLayer with the stock OpenSSH client you
 already have: `ssh`, `sftp`, `scp`, `~/.ssh/config`, `ProxyJump`, and
 connection multiplexing all work. This page shows the three ways to address
 a node, what the authentication prompts look like, and what to expect when
-access is refused. Every command here runs against the
-[quickstart](../getting-started/quickstart.md) stack.
+access is refused.
 
 ## Prerequisites
 
-- [ ] The quickstart stack is running and you completed it (your client
-      container has a pinned key for `alice@example.com`).
-- [ ] Commands run from the `examples/quickstart` directory; `curl` and `jq`
-      for the OTP section.
+- [ ] An identity that can authenticate to a Gateway, and at least one node
+      you are granted access to. If you are evaluating, that is what the
+      [quickstart](../getting-started/quickstart.md) leaves you with.
+- [ ] Your operator's Gateway address, its SSH port, and its host key or
+      fingerprint.
+- [ ] `curl` and `jq` for the OTP section, which is an admin's job.
+
+> **Note:** the runnable blocks on this page target the
+> [quickstart](../getting-started/quickstart.md) stack, so they are prefixed
+> with `docker compose exec -T client`. Against a real deployment, drop that
+> prefix and run the `ssh`/`sftp`/`curl` yourself: substitute your Gateway's
+> address for `gateway`, its SSH port for `2222`, and your Control Plane URL
+> for `http://127.0.0.1:8080`. The commands are otherwise identical, because
+> the client is stock OpenSSH either way.
 
 ## How addressing works
 
@@ -50,7 +59,7 @@ Typing the encoding every time gets old, so give each node a
 `~/.ssh/config` block. After this, plain `ssh web-01` works:
 
 ```bash
-docker compose exec -T client sh -c 'mkdir -p /root/.ssh && cat >> /root/.ssh/config <<EOF
+docker compose exec -T client sh -c 'cat >> /root/.ssh/config <<EOF
 Host web-01
   HostName gateway
   Port 2222
@@ -60,7 +69,19 @@ EOF'
 docker compose exec -T client ssh web-01 'hostname'
 ```
 
-> **Note:** inside `~/.ssh/config`, `%` is OpenSSH's expansion character, so
+```text
+web-01
+```
+
+> **Note:** on your own machine, `~/.ssh` must be `0700` and `~/.ssh/config`
+> `0600` or `ssh` refuses to read it (`Bad owner or permissions on
+> /root/.ssh/config`) and every connection fails. The client container ships
+> both at those modes already, which is why the block above only appends. A
+> shell redirection that *creates* the file gives it whatever your `umask`
+> allows, so run `chmod 700 ~/.ssh && chmod 600 ~/.ssh/config` after writing
+> one for the first time.
+>
+> Inside `~/.ssh/config`, `%` is OpenSSH's expansion character, so
 > the `User` value writes the separator as `%%` (a literal `deploy%web-01`).
 > There is no way to derive that from the hostname instead: `User` does not
 > expand `%h`/`%r` (you'll hit `vdollar_percent_expand: unknown key` if you
@@ -87,7 +108,7 @@ No first-use prompt, no leap of faith:
 
 ```bash
 GW_HOSTKEY=$(docker compose run --rm -T --entrypoint sh seed -c 'ssh-keygen -y -f /gw-data/ssh_host_key' 2>/dev/null)
-docker compose exec -T client sh -c "mkdir -p /root/.ssh && echo '[gateway]:2222 $GW_HOSTKEY' > /root/.ssh/known_hosts_gw"
+docker compose exec -T client sh -c "echo '[gateway]:2222 $GW_HOSTKEY' > /root/.ssh/known_hosts_gw"
 docker compose exec -T client ssh -p 2222 -o UserKnownHostsFile=/root/.ssh/known_hosts_gw \
   -o StrictHostKeyChecking=yes deploy%web-01@gateway 'echo verified, no TOFU'
 ```

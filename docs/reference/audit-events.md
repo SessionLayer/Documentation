@@ -172,10 +172,19 @@ tamper-evident open/close markers for each tunnel.
 ### Configuration changes
 
 Every config write is audited with before/after state in the detail. The pattern is
-`<resource>.create`, `<resource>.update`, `<resource>.delete` for: `rule`, `role`, `role_binding`,
+`<resource>.create`, `<resource>.update`, `<resource>.delete`, and every prefix is
+underscored regardless of how its URL path is spelled: `rule`, `role`, `role_binding`,
 `ca` (plus `ca.rotate`), `service_account`, `node_policy`, `capability_def`, `jit_policy`,
-`breakglass_policy`, and `session-limit-policy` (note: that last prefix is hyphenated, unlike the
-underscored config prefixes).
+`breakglass_policy`, `session_limit_policy`.
+
+The operator settings are a singleton, so they have an update and nothing else:
+`operator_settings.update`. It covers the retention windows, the WORM mode, and the
+session-limit defaults alike; the customer recording key is a separate sub-resource
+and does not appear here.
+
+> **Note:** `action` is matched exactly and is not validated, so a prefix that is
+> spelled with a hyphen (`session-limit-policy.update`) returns an empty page rather
+> than an error. That reads exactly like a change nobody made. Copy the names above.
 
 ### Audit access
 

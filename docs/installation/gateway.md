@@ -41,6 +41,15 @@ unready or draining before the pod stops listening.
 
 ## Get the image
 
+> **Warning:** the `ghcr.io/sessionlayer/*` packages are private. An
+> unauthenticated `docker pull` fails, and so does everything downstream
+> of it: `docker buildx imagetools inspect` cannot resolve a digest,
+> `cosign verify` and `gh attestation verify` cannot reach the manifest,
+> and any `--set image.digest="$DIGEST"` gets an empty variable. Until the
+> packages are made public, building from source (below) is the path that
+> works. The commands below are correct and are what to run once you have
+> registry access.
+
 ```bash
 docker pull ghcr.io/sessionlayer/gateway:v0.0.2
 ```
@@ -254,7 +263,7 @@ The chart refuses to render rather than installing something unsafe:
 | `replicaCount` above 1 | One release deploys one Gateway. Every pod reads the same configuration, so they enroll with the same single-use token and all but the first crash-loop on `UNAUTHENTICATED`. With `persistence.enabled` they would instead share one data directory, and one identity used twice reads to the Control Plane as a clone, which auto-locks it. |
 | `podDisruptionBudget.minAvailable` not below `replicaCount` | Such a budget refuses every voluntary eviction and hangs a node drain. |
 
-Two values worth setting deliberately:
+Three values worth setting deliberately:
 
 - `persistence.enabled` is `false`, so a restart re-enrolls and needs a fresh
   single-use token every time. Turn it on for anything but evaluation. A claim
@@ -299,21 +308,26 @@ static-validation-only status they ship with.
 The binary hardens itself at startup: privilege drop (bare-metal), a Landlock
 filesystem and egress sandbox, and a seccomp syscall allow-list. The
 container/systemd assets add the OS layer on top. Neither layer trusts the
-other:
+other. `hardening` is a top-level key of the same `gateway.json`:
 
 ```json
-"hardening": {
-  "run_as_user": "sessionlayer",
-  "landlock": {
-    "enabled": true,
-    "read_only_paths": ["/etc/sessionlayer", "/etc/ssl/certs", "/etc/resolv.conf",
-                        "/etc/hosts", "/etc/nsswitch.conf", "/lib", "/lib64",
-                        "/usr/lib", "/dev", "/proc"],
-    "read_write_paths": ["/var/lib/sessionlayer-gateway"]
-  },
-  "seccomp": { "mode": "enforce" }
+{
+  "hardening": {
+    "run_as_user": "sessionlayer",
+    "landlock": {
+      "enabled": true,
+      "read_only_paths": ["/etc/sessionlayer", "/etc/ssl/certs", "/etc/resolv.conf",
+                          "/etc/hosts", "/etc/nsswitch.conf", "/lib", "/lib64",
+                          "/usr/lib", "/dev", "/proc"],
+      "read_write_paths": ["/var/lib/sessionlayer-gateway"]
+    },
+    "seccomp": { "mode": "enforce" }
+  }
 }
 ```
+
+The file is strict JSON: no comments, no trailing commas. Merge this key into
+the object you wrote above rather than keeping it in a second file.
 
 `read_only_paths` has no default, and Landlock denies whatever no rule
 allows. An empty list therefore confines the Gateway to `data_dir` alone,
@@ -368,13 +382,52 @@ header from the LB is rejected too: fail closed both ways.
 
 ## Verify
 
+Enrollment is the step that can silently not have happened, so check it
+first. The Gateway logs the moment it has an identity and is listening:
+
+```bash
+docker logs sessionlayer-gateway 2>&1 | grep "outer SSH leg listening"
+```
+
+```text
+2026-08-15T20:03:35.772250Z  INFO outer SSH leg listening addr=0.0.0.0:2222
+```
+
+No such line means it never got that far: read the log from the top. A
+`UNAUTHENTICATED` in a restart loop means the enrollment token was already
+spent, and the fix is a fresh one rather than a retry.
+
+Then confirm the Control Plane agrees, which is the half the Gateway's own
+log cannot tell you (`gateway:enroll`):
+
+```bash
+curl -s -G https://cp.example.com/v1/gateways \
+  -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode "name=gw-1" | jq '.items[] | {name, status, fingerprintSha256}'
+```
+
+```json
+{
+  "name": "gw-1",
+  "status": "active",
+  "fingerprintSha256": "eab996c8cceed7c1b7c43661efd1673e95563e2679d546040cce18ce298d5f85"
+}
+```
+
+A row with your Gateway's name is an enrolled, lockable principal. An empty
+`items` list means the Gateway is running on compiled-in defaults and has not
+enrolled at all.
+
+Only then is the SSH front door worth testing:
+
 ```bash
 ssh -p 2222 'deploy%web-01'@gw.example.com
 # expect: a generic authentication failure. No access rules exist yet, so
 # every credential is refused (denials are deliberately uninformative).
 ```
 
-That is the platform working, not a misconfiguration. Continue with
+That refusal is the platform working, not a misconfiguration: it proves the
+listener is up and the policy path is default-deny. Continue with
 [node enrollment](../admin-guides/nodes.md) and [RBAC](../admin-guides/rbac.md),
 then connect for real.
 

@@ -20,9 +20,11 @@ locked) and a startup renewal both classify the same way.
 
 > **Warning:** configure the orchestrator so codes 3 and 4 page and do not
 > silently restart. A blind restart loop turns a security signal into noise.
-> On systemd: `Restart=on-failure` and `RestartPreventExitStatus=3 4`. On
-> Kubernetes, `restartPolicy: OnFailure` will loop, so alert on the exit code
-> instead.
+> On systemd: `Restart=on-failure` and `RestartPreventExitStatus=3 4`. A
+> Kubernetes DaemonSet cannot express this at all: its pods only accept
+> `restartPolicy: Always`, so kubelet restarts the container whatever it
+> exited with. Alert on the exit code instead, per
+> [Monitoring](monitoring.md).
 
 ## Alert: `SECURITY: generation mismatch on renewal ... auto-locked` (exit 3)
 
@@ -157,16 +159,17 @@ needs node-root compromise, not merely a compromised Agent: putting an
 agent on the node raises this bar rather than lowering it. The
 Gateway's no-TOFU host verification is what actually catches a splice
 to an impostor; the Agent is not a party to that check and cannot
-weaken it. A Docker end-to-end test asserts the Agent account cannot
-read the host key.
+weaken it. `Agent/tests/splice_e2e.rs` asserts this directly, running
+`cat /etc/ssh/ssh_host_ed25519_key` as uid 65532 on the node and
+requiring it to fail.
 
 ## The node-local sshd second trail
 
 The node's own `sshd` log is a second, tamper-independent record of every
 session. The inner-leg certificate's `key_id` is `session_id` plus
-identity, and a node running `LogLevel VERBOSE` (set in the canonical
-`testing/docker/sshd/sshd_config`, and required on real nodes) logs that
-key ID on every accepted certificate.
+identity, and a node running `LogLevel VERBOSE` logs that key ID on every
+accepted certificate. Setting it is part of preparing a node's `sshd`
+([Nodes](../admin-guides/nodes.md)).
 
 The Agent deliberately does not forward this log. The whole value of a
 second trail is that it does not depend on the Agent: the Agent neither

@@ -77,6 +77,15 @@ violations.
 
 ## Run the published image
 
+> **Warning:** the `ghcr.io/sessionlayer/*` packages are private. An
+> unauthenticated `docker pull` fails, and so does everything downstream
+> of it: `docker buildx imagetools inspect` cannot resolve a digest,
+> `cosign verify` and `gh attestation verify` cannot reach the manifest,
+> and any `--set image.digest="$DIGEST"` gets an empty variable. Until the
+> packages are made public, building your own image (below), which every
+> real deployment needs anyway is the path that works. The commands below
+> are correct and are what to run once you have registry access.
+
 ```bash
 docker pull ghcr.io/sessionlayer/dashboard:v0.0.2
 ```

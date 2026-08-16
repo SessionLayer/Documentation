@@ -10,8 +10,9 @@ only you, the operator, hold. The platform stores the public half and the
 ciphertext; replay decrypts in your browser with a key that never leaves it.
 There is no platform-side decryption path: a platform admin, a compromised
 Control Plane, or SessionLayer's developers can read recording *metadata*,
-never content. This is tested directly, not merely asserted: a reader
-holding everything the platform holds still cannot decrypt. See
+never content. The reason is structural rather than procedural: the platform
+is never given the private half, so holding everything it holds still does not
+decrypt a recording. See
 [Session recording](admin-guides/session-recording.md).
 
 ## Is this really "zero trust" if it man-in-the-middles my SSH?
@@ -68,8 +69,7 @@ audit trail. A fleet can mix both models.
 ## Can I manage configuration via GitOps?
 
 Not in this release. A Git reconciler was designed but descoped by decision.
-The two related requirements are the only unimplemented rows in the
-production sign-off, recorded as gaps rather than quietly dropped. Everything
+Everything
 is manageable via the [REST API](reference/api.md), which your own pipeline
 can drive, and the Dashboard. Nothing in these docs describes a GitOps flow,
 because none exists.

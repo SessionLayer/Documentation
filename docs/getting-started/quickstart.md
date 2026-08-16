@@ -13,9 +13,10 @@ OpenSSH, and the platform's real REST API for every step.
 
 ## Prerequisites
 
-- [ ] Docker Engine and the `docker compose` plugin, v2.24 or newer (the stack
-      uses `additional_contexts`, added in v2.24). Tested with Docker 29 and
-      Compose v5.3. Check with `docker compose version`. On x86_64 or aarch64
+- [ ] Docker Engine and the `docker compose` plugin. Check with
+      `docker compose version`. Tested on Docker 29 with Compose v5.3 and
+      v5.4; the stack uses `--wait` and `service_completed_successfully`,
+      so a v2 plugin older than 2.17 will not run it. On x86_64 or aarch64
       Linux; macOS with Docker Desktop is expected to work but is untested.
 - [ ] `curl` and `jq`.
 - [ ] About 10 GB of free disk during the first build and 4 GB of free RAM;
@@ -24,7 +25,7 @@ OpenSSH, and the platform's real REST API for every step.
       earlier ones.
 
 > **Note:** the first `docker compose up` installs the Control Plane and the
-> Gateway from their real, signed `v0.0.1` GitHub Releases, the same install
+> Gateway from their real, signed `v0.0.2` GitHub Releases, the same install
 > path a production node uses. Each image's build downloads the release
 > artifact plus its keyless cosign Sigstore bundle and verifies the signature
 > against the exact release-workflow identity before the artifact ever runs;
@@ -164,7 +165,7 @@ A pin is an authentication shortcut with a TTL, the same thing the platform
 creates automatically after an OTP or device-flow login:
 
 ```bash
-docker compose exec -T client sh -c 'mkdir -p /root/.ssh && ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519 -q'
+docker compose exec -T client sh -c 'ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519 -q'
 FP=$(docker compose exec -T client ssh-keygen -lf /root/.ssh/id_ed25519.pub | awk '{print $2}')
 curl -s -X POST http://127.0.0.1:8080/v1/pins \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
@@ -183,6 +184,16 @@ minted per connection, only after the rule above says yes.
 docker compose exec -T client ssh -p 2222 -o StrictHostKeyChecking=accept-new \
   deploy%web-01@gateway 'echo hello from $(hostname); id -un'
 ```
+
+```text
+Warning: Permanently added '[gateway]:2222' (ED25519) to the list of known hosts.
+hello from web-01
+deploy
+```
+
+The warning is `accept-new` recording the front door's key on first contact,
+and appears once. `deploy` is the Linux login the rule resolved to, printed by
+the node itself.
 
 That's a stock `ssh` client addressing node `web-01` as login `deploy` through
 the Gateway (the `login%node` username encoding; the

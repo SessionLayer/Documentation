@@ -109,7 +109,27 @@ curl -s https://cp.example.com/v1/nodes \
 > trust whatever key it shows up with later." That would be trust-on-first-use, and a network attacker
 > in the Gateway→node path could then impersonate the node. If the node is
 > ever re-keyed, update its anchor before the old one stops matching, or
-> sessions to it will (correctly) abort.
+> sessions to it will (correctly) abort. See
+> [Repair or rotate a node's host anchor](#repair-or-rotate-a-nodes-host-anchor).
+
+Confirm it landed, and that the anchor came with it:
+
+```bash
+curl -s https://cp.example.com/v1/nodes \
+  -H "Authorization: Bearer $TOKEN" | jq '.nodes[] | {name, status, health}'
+```
+
+```json
+{
+  "name": "web-01",
+  "status": "active",
+  "health": "unknown"
+}
+```
+
+`unknown` is the right answer for an agentless node and is not a fault; see
+[Node lifecycle at a glance](#node-lifecycle-at-a-glance). What would be wrong
+is `unhealthy`, which means the anchor did not register.
 
 `labels` are what [data-plane rules](rbac.md) and [locks](locks.md) select
 on. Label nodes at enrollment time, not later during an incident.
@@ -122,8 +142,9 @@ the `/v1/operator-settings` fields.
 ## Enroll an agent node
 
 Register the node, issue a join token, then start the Agent on the host.
-Registration comes first: it is where the node's host-identity anchor is set,
-and nothing adds one later.
+Registration comes first, because it is where the node's host-identity anchor
+is set. Skipping it is repairable rather than fatal, but the repair is a
+second step you have to notice you need.
 
 ### 1. Register the node
 
@@ -158,11 +179,12 @@ used.
 
 > **Warning:** skipping this step does not fail loudly. An Agent joining a
 > name that does not exist creates the node itself, with no anchor, and every
-> session to it then aborts at host verification. The anchor is written at
-> registration and only there, and removing the node does not release its
-> name: removal is a soft delete, the name stays reserved, and re-registering
-> it returns `409`. The repair is to register a replacement node under a new
-> name and restart the Agent with `--node-name` pointing at it.
+> session to it then aborts at host verification. Such a node reads
+> `"health": "unhealthy"`, and `GET /v1/nodes/{nodeId}/host-anchors` returns
+> an empty `anchors` list, which is how you tell it apart from a network
+> problem. Repair it in place with `PUT` on the same path (below); you do not
+> have to abandon the name. Removal would not free it anyway: removal is a
+> soft delete, the name stays reserved, and re-registering it returns `409`.
 
 ### 2. Issue a join token
 
@@ -258,6 +280,38 @@ The Agent refuses to boot with two endpoints in one failure domain: that is
 not real HA. See [High availability](high-availability.md) for how ownership
 and failover work.
 
+## Repair or rotate a node's host anchor
+
+A node's anchor set is replaceable in place, which is what you reach for when
+a node is re-keyed and when an Agent auto-created a node with no anchor at
+all. Read the current set first (`node:enroll`):
+
+```bash
+curl -s https://cp.example.com/v1/nodes/$NODE_ID/host-anchors \
+  -H "Authorization: Bearer $TOKEN" | jq '.anchors[] | {source, keyType, fingerprint}'
+```
+
+An empty `anchors` list is the diagnosis for a node whose every session
+aborts. Replace the set with the anchor the node actually presents now:
+
+```bash
+curl -s -X PUT https://cp.example.com/v1/nodes/$NODE_ID/host-anchors \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "pinnedHostKey": "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBExampleOnlyNotARealKey= root@web-01" }'
+```
+
+The `PUT` is a whole-set replace in one transaction, so the node is never
+briefly anchorless and never briefly still trusting the key you are
+retiring. Send at least one of `hostCertificate` or `pinnedHostKey`: an empty
+set is a `422`, because a node with no anchor does not fall back to
+trust-on-first-use, it stops working. A `removed` node is a `409` — removal
+is terminal, and such a host comes back as a fresh registration under a new
+name.
+
+Sequence a planned re-key the same way you sequence a CA rotation: write the
+new anchor before the node starts presenting it, or sessions abort in the gap.
+
 ## How users address a node: name → id
 
 Users always dial a node by its name (`web-01`), carried inside the SSH
@@ -322,9 +376,24 @@ that name again returns `409`. Bring the host back under a new node name.
 | `quarantined` | locked by an admin | no |
 | `removed` | deregistered; history kept | no |
 
-Nodes also report `health` (`healthy`, `unhealthy`, `unreachable`,
-`unknown`). An agent node whose Agent holds no control channel cannot be
-reached. Users get the generic post-authorization node-offline error.
+Nodes also report `health`, computed per request rather than stored:
+
+| `health` | Means |
+|---|---|
+| `unhealthy` | The node has no host-identity anchor, so every session to it aborts at host verification. Enrolled but unusable; repair the anchor. This outranks everything below it. |
+| `healthy` | An agent node whose Agent holds a control channel to a Gateway, heartbeat fresh. |
+| `unreachable` | An agent node a Gateway once held and whose heartbeat has gone stale. |
+| `unknown` | An agent node no Gateway has ever claimed, so its Agent has not joined yet. |
+
+> **Note:** an agentless node is **always** `unknown`, and that reports
+> nothing wrong. The Control Plane holds no continuous liveness signal for a
+> node it dials on demand, and it runs no probe of its own, so `unknown` is
+> the only honest answer for the connector model most fleets use. Do not read
+> it as a fault, and do not wait for `healthy` on an agentless node: it never
+> arrives. `owningGateway` is absent for the same reason.
+
+Users get the generic post-authorization node-offline error whichever of
+these applies.
 
 ## Next
 

@@ -19,6 +19,30 @@ The error taxonomy in one table:
 | `session cannot start: recording unavailable` | strict recording (always, for break-glass) could not start | specific |
 | `service temporarily unavailable` | Control Plane unreachable, new sessions fail closed | specific |
 
+Everything above is a running platform. If you are still installing one, start
+with the section below instead.
+
+## Install-time failures
+
+These land before any session exists, so none of the audit machinery above
+applies yet. The log of the component that refused is the whole diagnosis.
+
+| What you see | Where | What it is |
+|---|---|---|
+| `denied` or `unauthorized` from `docker pull ghcr.io/sessionlayer/…` | your shell | The packages are private. Build from source instead; every install page has the commands ([Install the Control Plane](../installation/control-plane.md)) |
+| `$DIGEST` empty, then `manifest unknown` or a chart installing the wrong image | your shell, then the cluster | Same cause: `docker buildx imagetools inspect` could not reach the manifest. Do not deploy a tag as a fallback; build, push to your own registry, and pin that digest |
+| `Error: parsing gateway config <path>: key must be a string` | Gateway, at startup | `gateway.json` is not strict JSON. A `//` comment or a trailing comma does this, and it lands before any hardening applies ([Install the Gateway](../installation/gateway.md)) |
+| `UNAUTHENTICATED` on the Gateway, in a restart loop | Gateway | The enrollment token was already spent. It is single-use: mint a fresh one. Running two Gateway replicas from one release does this to all but the first |
+| The Control Plane exits at startup naming `sessionlayer.ca.local.kek-base64` | Control Plane | No key-encryption key. This is a refusal, not a crash: set a real KEK. Never reach for `allow-dev-kek` to get past it ([Production hardening](../security/hardening.md)) |
+| Flyway fails and the Control Plane never becomes ready | Control Plane | Check the owner-role credentials first (`spring.flyway.*`, distinct from `spring.r2dbc.*`). A readiness probe that never passes during a first boot is usually a startup budget too short for CA cold start, not a migration fault |
+| `Bad owner or permissions on ~/.ssh/config` | your SSH client | `~/.ssh` must be `0700` and the config `0600`. Nothing to do with the platform ([SSH access](../user-guide/ssh-access.md)) |
+| `401` scraping `/actuator/prometheus` or `/actuator/metrics` | Prometheus | Both need the `metrics:read` permission. Only `/v1/healthz`, `/v1/version`, `/actuator/health` and `/actuator/info` are public ([Metrics](../reference/metrics.md)) |
+| `{"status":400,"error":"Bad Request"}` with no `title` or `detail` | any API call | Schema validation rejected the body or a required query parameter before it reached a handler, so nothing names the field. Re-read the operation's required set in the [API reference](../reference/api.md) |
+| A cosign verification failure during an image build | your build | Correct behaviour: the build refuses an artifact it cannot verify, and there is no fallback to an unverified one. Check the tag exists and that you are on cosign v3.0.4 or newer ([Supply chain](../security/supply-chain.md)) |
+
+> **Note:** a `docker compose up` that fails once with `No such image` on a
+> clean machine is a pull race, not a configuration error. Run it again.
+
 ## Connection dropped before any SSH banner
 
 No banner means the TCP connection was cut at accept, before SSH existed.
@@ -69,9 +93,14 @@ allow matched. The checklist, roughly in observed frequency order:
    denial ([Session limits](../admin-guides/session-limits.md)).
 5. The requested login is not in the rule's principals, for example
    `ssh deploy%...` against a rule that grants `www`.
-6. A JIT grant expired or not yet active. Check the request's clocks
+6. The login is outside the presented credential's own scope, which is a
+   separate reducer from the rule: a pin lists the logins it may ask for, and
+   asking for one it does not carry is refused before grants, JIT and
+   break-glass are considered. The decision carries `note`
+   `credential_principal_scope`.
+7. A JIT grant expired or not yet active. Check the request's clocks
    ([JIT access](../admin-guides/jit-access.md)).
-7. The lock feed is unhealthy on that Gateway; it refuses what it cannot
+8. The lock feed is unhealthy on that Gateway; it refuses what it cannot
    verify ([Gateway runbook](gateway-runbook.md)).
 
 ## Authentication failures
@@ -102,18 +131,23 @@ node side (`LOCAL_DIAL_FAILED` means the node's own `sshd` is down; a
 reconnect loop means a TLS/server-name/version mismatch; all channels down
 means use out-of-band recovery).
 
-Also check the boring one first: `GET /v1/nodes`. Is the node `active` and
-`healthy`, or did someone quarantine it?
+Also check the boring one first: `GET /v1/nodes`. Is the node `active`, or did
+someone quarantine it? Read `health` alongside it, but read it correctly: an
+agentless node is *always* `unknown` and that is not a fault, so the value
+worth reacting to is `unhealthy`, which means the node has no host-identity
+anchor and every session to it aborts. `GET /v1/nodes/{nodeId}/host-anchors`
+returning an empty list confirms it ([Nodes](../admin-guides/nodes.md)).
 
 ## Host-identity verification failures
 
 A session that dies at the inner leg with a host-verification abort (and a
 `gateway.host_verify` error span or log) means the node presented a key or
 certificate that does not match its enrolled anchor. This is the no-TOFU
-guarantee working. Either the node was re-keyed without re-enrollment
-(update its anchor, see [Nodes](../admin-guides/nodes.md)), or something is
-impersonating the node; investigate before you fix it. The user sees only
-the generic node-unreachable message; the detail is operator-side.
+guarantee working. Either the node was re-keyed without its anchor being
+updated (replace the anchor set with `PUT /v1/nodes/{nodeId}/host-anchors`,
+see [Nodes](../admin-guides/nodes.md)), or something is impersonating the
+node; investigate before you fix it. The user sees only the generic
+node-unreachable message; the detail is operator-side.
 
 ## "Session cannot start: recording unavailable"
 
@@ -143,7 +177,11 @@ hard-kill), an idle timeout (`idle_timeout`, activity-tracked, per
 deadline during maintenance ([Upgrades](upgrades.md)), or a mid-session
 recording failure under strict mode.
 
-The `endReason` vocabulary is closed:
+These are the values the Control Plane writes. Nothing constrains the column
+to them: there is no `CHECK` and no enum in the API contract, deliberately, so
+that a session-end write can never fail on a value the schema did not
+anticipate. Treat the list as the set to expect, not as one the database
+enforces:
 
 | `endReason` | Means |
 |---|---|
@@ -157,7 +195,8 @@ The `endReason` vocabulary is closed:
 
 It is advisory. The authoritative "why" for a teardown is the lock or
 decision entry in the audit chain, not this field: a drain and a clean
-logout are both `closed`.
+logout are both `closed`, and a Gateway that refused a session the Control
+Plane had already allowed lands in `error`.
 
 ## A channel is refused inside a working session
 

@@ -124,6 +124,15 @@ startup failure for regimes that cannot accept it.
 
 ## Run it in a container
 
+> **Warning:** the `ghcr.io/sessionlayer/*` packages are private. An
+> unauthenticated `docker pull` fails, and so does everything downstream
+> of it: `docker buildx imagetools inspect` cannot resolve a digest,
+> `cosign verify` and `gh attestation verify` cannot reach the manifest,
+> and any `--set image.digest="$DIGEST"` gets an empty variable. Until the
+> packages are made public, the verified release binary above, or building
+> the image from `deploy/Dockerfile` is the path that works. The commands
+> below are correct and are what to run once you have registry access.
+
 ```bash
 docker pull ghcr.io/sessionlayer/agent:v0.0.2
 ```
@@ -250,9 +259,29 @@ The node appears in the inventory once its Agent holds control channels.
 [Authentication](../admin-guides/authentication.md):
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" https://cp.example.com/v1/nodes | jq '.nodes[] | {name, status, health}'
-# expect: {"name": "web-01", "status": "active", "health": "healthy"}
+curl -s -G https://cp.example.com/v1/nodes \
+  -H "Authorization: Bearer $TOKEN" | jq '.nodes[] | {name, status, health, owningGateway}'
 ```
+
+```json
+{
+  "name": "web-01",
+  "status": "active",
+  "health": "healthy",
+  "owningGateway": "gw-1"
+}
+```
+
+`health` is what tells you the join took: an agent node reads `healthy` only
+while a Gateway holds its control channel on a fresh heartbeat, and
+`owningGateway` names that Gateway. The other values are diagnoses rather
+than degrees of the same thing:
+
+| You see | It means |
+|---|---|
+| `unknown`, no `owningGateway` | No Gateway has ever claimed this node. The Agent has not reached one: check `--gateway-endpoint`, the network path, and the Agent's own log |
+| `unreachable` | A Gateway held it and the heartbeat went stale. The Agent died, or the path to that Gateway did |
+| `unhealthy` | The node has no host-identity anchor, so it is enrolled and unusable whatever the Agent does. This is the auto-created-node case: repair it with `PUT /v1/nodes/{nodeId}/host-anchors` ([Nodes](../admin-guides/nodes.md)) |
 
 In HA deployments give the Agent at least two Gateways in different failure
 domains: it holds a control channel to each and survives losing one.

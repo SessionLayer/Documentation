@@ -1,8 +1,8 @@
 # How SessionLayer compares
 
 SessionLayer covers one thing, SSH access to a Linux fleet, and is deliberate
-about what it leaves out. Every claim here is backed by the platform's code
-and proof suite; the omissions are as deliberate as the features.
+about what it leaves out. The omissions below are as deliberate as the
+features, and each one links to the page that explains the trade.
 
 ## What SessionLayer is
 
