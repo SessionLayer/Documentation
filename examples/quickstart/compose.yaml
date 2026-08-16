@@ -1,13 +1,3 @@
-# SessionLayer single-host evaluation stack (see docs/getting-started/quickstart.md).
-#
-# Everything runs in containers on one Compose network: Postgres, MinIO (the WORM
-# recording store), the Control Plane, the Gateway, one node, and a stock OpenSSH
-# client so the guide never touches your host SSH setup. The Control Plane and
-# Gateway are installed from the real, signed v0.0.2 GitHub Releases (verified
-# with cosign at image-build time — see cp.Dockerfile/gateway.Dockerfile and
-# docs/security/supply-chain.md), not built from source, so you only clone the
-# Documentation repository.
-#
 # Every credential in this file is a DEV-ONLY placeholder for a throwaway
 # evaluation. All published ports bind to 127.0.0.1 only.
 name: sessionlayer-quickstart
@@ -53,9 +43,6 @@ services:
     build:
       context: .
       dockerfile: cp.Dockerfile
-      # The real, signed v0.0.2 release — cosign-verified at build time in
-      # cp.Dockerfile's fetch stage (docs/security/supply-chain.md). Override
-      # with --build-arg CP_TAG=/CP_JAR_VERSION= to track a later release.
       args:
         CP_TAG: "0.0.2"
         CP_JAR_VERSION: "0.0.2"
@@ -66,8 +53,6 @@ services:
       SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/sessionlayer
       SPRING_FLYWAY_USER: sessionlayer
       SPRING_FLYWAY_PASSWORD: sessionlayer
-      # Dev-only: lets the local CA backend run with a built-in KEK. Production
-      # uses a KMS/Key Vault/Vault-backed CA or a real KEK (see the hardening guide).
       SESSIONLAYER_CA_LOCAL_ALLOW_DEV_KEK: "true"
       SESSIONLAYER_MTLS_SERVER_PORT: "9443"
       SESSIONLAYER_RECORDING_WORM_ENDPOINT: http://minio:9000
@@ -86,11 +71,9 @@ services:
       retries: 60
       start_period: 90s
 
-  # One-shot provisioning that has no public API surface: extracts the CA
-  # trust anchors, mints the Gateway's enrollment token, creates the admin
-  # service account, and installs the customer recording key (public half only).
-  # Everything else in the guide uses the real REST API. Idempotent across
-  # re-runs of `docker compose up`.
+  # One-shot provisioning written straight to the database so the guide can start
+  # at the interesting part; every item it seeds has a REST API a real install uses
+  # instead (see seed/seed.sh). Idempotent across re-runs of `docker compose up`.
   seed:
     build: ./seed
     volumes:
@@ -105,9 +88,6 @@ services:
     build:
       context: .
       dockerfile: gateway.Dockerfile
-      # The real, signed v0.0.2 release — cosign-verified at build time in
-      # gateway.Dockerfile's fetch stage. Override with --build-arg GW_TAG= to
-      # track a later release.
       args:
         GW_TAG: "0.0.2"
     command: ["--config", "/state/gateway.json"]
@@ -143,8 +123,6 @@ services:
       gateway:
         condition: service_started
 
-  # Offline SLREC1 decryptor (docs/user-guide has the format background). Run on
-  # demand: docker compose run --rm -T decrypt <object> > session.cast
   decrypt:
     profiles: [tools]
     build: ./tools
@@ -156,7 +134,6 @@ services:
 volumes:
   pgdata: {}
   miniodata: {}
-  # Shared public trust material (CA anchors) + the rendered Gateway config.
   state: {}
   # The demo customer recording PRIVATE key — mounted only into `seed` and the
   # `decrypt` tool, never into the recorded node, the client, or the Gateway.

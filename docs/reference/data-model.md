@@ -353,7 +353,7 @@ Added 12 config + 18 runtime = 30 tables total (was 22), plus `audit_event` rang
   row per `ca_kind`, closing a race where two concurrent `beginRotation` calls could strand a
   never-expiring key in the trusted set.
 
-### Internal mTLS plane + T4 hardening (`V14`-`V15`)
+### Internal mTLS plane, and the credential hardening that followed (`V14`-`V15`)
 
 Added 12 config + 20 runtime = 32 tables total (was 30); no new config table.
 
@@ -367,7 +367,7 @@ Added 12 config + 20 runtime = 32 tables total (was 30); no new config table.
     `SignSessionCertificate`, bound to `{gateway_id, session_id, node_id, principal, capabilities,
     exp}`, single-use (`used`/`used_at`), 120 s TTL; `capabilities` CHECK-constrained to the SSH
     capability set, `source_address` CIDR/IP-validated.
-- T4 hardening (`V15`):
+- Client-certificate pinning, and single-use tokens that cannot be erased (`V15`):
   - `runtime.gateway_identity` gains `prev_fingerprint text` (nullable): renew/sign RPCs pin the
     presented client cert's SHA-256 fingerprint to `{current, previous}`, tolerating the renew-ahead
     overlap. `renew` records the outgoing fingerprint; NULL for a freshly-enrolled (generation 0)

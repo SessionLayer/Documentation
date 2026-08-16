@@ -9,7 +9,6 @@ if [ -f /state/session_ca.pub ]; then
 	chmod 644 /etc/ssh/trusted_user_ca.pub
 fi
 
-# Generate any missing host keys (idempotent across restarts).
 ssh-keygen -A >/dev/null 2>&1 || true
 
 mkdir -p /run/sshd

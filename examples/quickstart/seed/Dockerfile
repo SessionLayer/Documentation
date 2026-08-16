@@ -1,7 +1,5 @@
 FROM debian:13-slim
 
-# psql for the seed statements, ssh-keygen to convert the session CA public key
-# into an OpenSSH TrustedUserCAKeys line, openssl for the demo customer key.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       postgresql-client \
