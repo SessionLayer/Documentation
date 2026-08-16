@@ -1,21 +1,4 @@
 #!/bin/sh
-# One-shot quickstart provisioning, written straight to the database so the
-# guide can start at the interesting part. Every item below has a REST API a
-# real install uses instead (/v1/cas, /v1/gateway-enrollment-tokens,
-# /v1/service-accounts, /v1/operator-settings/recording-customer-key); the
-# shortcut is skipping the bootstrap claim that yields the first credential.
-# Everything after this in the guide goes through the real REST API.
-#
-#   1. the internal mTLS CA certificate  -> /state/ca.pem        (Gateway trust anchor)
-#   2. the session CA public key         -> /state/session_ca.pub (node TrustedUserCAKeys)
-#   3. a single-use Gateway enrollment token + the rendered Gateway config
-#   4. the `quickstart-admin` service account + its dev-only client secret
-#      (the first-admin bootstrap claim in the guide is what makes it an admin)
-#   5. a demo customer recording key pair: the PUBLIC half goes to the Control
-#      Plane; the private half stays on the dedicated /keys volume (mounted
-#      only here and into the decrypt tool) and never leaves this stack
-#
-# Idempotent: safe to re-run on every `docker compose up`.
 set -eu
 
 STATE=/state
@@ -124,8 +107,6 @@ FROM config.service_account sa WHERE sa.name='quickstart-admin'
   AND NOT EXISTS (SELECT 1 FROM runtime.service_account_credential c WHERE c.service_account_name='quickstart-admin');
 SQL
 
-# The private half lives on its own volume (/keys), mounted only here and into
-# the decrypt tool — never into the recorded node, the client, or the Gateway.
 if [ ! -f /keys/customer_key.pem ]; then
 	log "generating the demo customer recording key (public half -> Control Plane)"
 	openssl ecparam -name prime256v1 -genkey -noout -out /keys/customer_key.pem 2>/dev/null

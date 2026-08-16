@@ -1,10 +1,3 @@
-# The quickstart node: a real OpenSSH server on slim Debian 13, adapted from the
-# platform's canonical test node (testing/docker/sshd in the source tree).
-#
-# Cert auth model: this sshd trusts ONLY the SessionLayer session CA
-# via TrustedUserCAKeys. The entrypoint installs the CA public key from the
-# seed-written state volume. Login accounts `deploy` and `dba` are the
-# RBAC-resolved Linux principals.
 FROM debian:13-slim
 
 RUN apt-get update \
@@ -27,6 +20,4 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 22
-# sshd -D -e stays foreground and logs to stderr; VERBOSE logging surfaces the
-# cert key-id (session id + identity) — the node-local audit trail.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

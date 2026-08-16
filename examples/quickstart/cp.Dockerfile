@@ -1,11 +1,4 @@
 # syntax=docker/dockerfile:1
-# SessionLayer Control Plane — installed from the signed, verified GitHub
-# Release, not built from source. This is the production-style install path
-# (docs/security/supply-chain.md): download the release jar + its keyless
-# cosign Sigstore bundle, verify the signature against the exact expected
-# release-workflow identity, and only then run it. A verification failure
-# fails the image build — there is no fallback to an unverified jar.
-#
 # CP_TAG is the git release tag (what the release workflow signed as).
 # CP_JAR_VERSION is the jar's own filename version, from pom.xml's <version>.
 # They are equal today, but they remain separate build args because nothing
@@ -17,9 +10,6 @@ ARG CP_TAG=0.0.2
 ARG CP_JAR_VERSION=0.0.2
 ARG CP_REPO=SessionLayer/ControlPlane
 ARG COSIGN_VERSION=v3.1.2
-# cosign's own checksum (not just TLS-to-github.com) roots the whole
-# verify-then-use chain — an unverified cosign binary is a verifier that
-# would approve anything.
 ARG COSIGN_SHA256=f7622ed3cf22e55e1ae6377c080979ff77a22da9981c11df222a2e444991e7cf
 RUN apk add --no-cache curl
 RUN curl -fsSL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" -o /usr/local/bin/cosign \

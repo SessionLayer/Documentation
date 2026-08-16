@@ -1,6 +1,3 @@
-# A stock Debian 13 OpenSSH *client*, so the quickstart never depends on (or
-# touches) the SSH setup of the machine you run it on. The guide `exec`s ssh,
-# sftp, and scp in here; the container just stays alive.
 FROM debian:13-slim
 
 RUN apt-get update \
