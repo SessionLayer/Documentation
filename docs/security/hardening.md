@@ -164,8 +164,8 @@ for the two adoption procedures, and
 [Data model](../reference/data-model.md#enums) for why the stored backend set
 is wider than the usable one.
 
-For every CA still on `local` — the internal mTLS CA always, the three SSH CAs
-by default — the private key lives in the Control Plane's process,
+For every CA still on `local` - the internal mTLS CA always, the three SSH CAs
+by default - the private key lives in the Control Plane's process,
 envelope-encrypted under a key-encryption key sourced from operator
 configuration, never from the database:
 
@@ -405,7 +405,7 @@ sha256sum trusted_root.json   # record and pin this digest in your config manage
 
 > **Warning:** `--with-default-services` needs cosign **v3.0.4 or newer**.
 > Every release before it rejects the flag outright, including the whole 2.x
-> line and 3.0.0–3.0.2 — being on 3.x is not sufficient. See
+> line and 3.0.0–3.0.2 - being on 3.x is not sufficient. See
 > [Supply chain](supply-chain.md) for the boundary and for what an omitted
 > flag silently produces instead.
 >

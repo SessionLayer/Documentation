@@ -398,7 +398,7 @@ compromise, drain the outgoing key as soon as your trust distribution has
 landed, and rely on the lock for the interval in between.
 
 > **Warning:** an empty request body regenerates the *same* backend, key
-> reference, and algorithm the active CA already has — it is not a way to
+> reference, and algorithm the active CA already has - it is not a way to
 > change any of the three. `backend`, `keyReference`, and `algorithm` are real,
 > validated overrides for the incoming key, checked before anything is
 > written: naming a backend this build has no signer for, a Key Vault reference

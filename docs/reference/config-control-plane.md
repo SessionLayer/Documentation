@@ -96,7 +96,7 @@ a positive algorithm allow-list (no shared secret).
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `sessionlayer.authz.decision-ttl` | duration | `PT45S` | How long a Gateway may serve per-channel checks from a cached decision context before re-authorizing. The Gateway additionally enforces its own ceiling. |
-| `sessionlayer.authz.max-grant-ttl` | duration | `PT1H` | Cluster ceiling on a grant's expiry, and it **always applies**. It is one term of a longer `min` — see [Session limits](../admin-guides/session-limits.md) for the whole formula; restating part of it here is how the eight-hour default came to be documented as achievable when this ceiling silently caps it at one. |
+| `sessionlayer.authz.max-grant-ttl` | duration | `PT1H` | Cluster ceiling on a grant's expiry, and it **always applies**. It is one term of a longer `min` - see [Session limits](../admin-guides/session-limits.md) for the whole formula; restating part of it here is how the eight-hour default came to be documented as achievable when this ceiling silently caps it at one. |
 | `sessionlayer.authz.context-signer-cert-ttl` | duration | `PT24H` | Validity of the decision-context signer leaf, re-minted from the internal mTLS CA at startup. Gateways pin the CA, not the leaf. |
 
 ## Lock feed (`sessionlayer.locks.*`)
@@ -118,7 +118,7 @@ live in [session-limit policies](api.md).
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `sessionlayer.session-limits.default-max-concurrent` | int | unset (unlimited) | Cluster-default concurrent-session cap per identity. Set ⇒ reconciled into operator settings at bootstrap and authoritative on each boot. |
-| `sessionlayer.session-limits.default-max-session-seconds` | int | unset (none) | Cluster-default max session duration, folded into the grant expiry as one term of a `min` — **setting it alone does not raise the ceiling**, because `sessionlayer.authz.max-grant-ttl` (`PT1H`) also applies. [Session limits](../admin-guides/session-limits.md) states the full formula. |
+| `sessionlayer.session-limits.default-max-session-seconds` | int | unset (none) | Cluster-default max session duration, folded into the grant expiry as one term of a `min` - **setting it alone does not raise the ceiling**, because `sessionlayer.authz.max-grant-ttl` (`PT1H`) also applies. [Session limits](../admin-guides/session-limits.md) states the full formula. |
 | `sessionlayer.session-limits.default-idle-timeout-seconds` | int | unset (none) | Cluster-default idle timeout, signed into the decision context; the Gateway applies it tighten-only against its own idle bound. |
 | `sessionlayer.session-limits.lease-extension` | duration | `PT15M` (floor `PT60S`) | Server-authoritative window a lease extension re-stamps a live session's lease to. Below-floor values are clamped with a warning. |
 | `sessionlayer.session-limits.reaper.enabled` | boolean | `true` | Runs the leaked-lease sweep. |
@@ -292,7 +292,7 @@ the adoption procedure and the minimum Azure role.
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `sessionlayer.ca.azure.enabled` | boolean | `false` | Whether the Azure Key Vault CA backend is configured on this Control Plane. Off, `azure_keyvault` is refused with a `422` naming this property. |
-| `sessionlayer.ca.azure.vault-uri` | string (URL) | none | The one vault this Control Plane signs in. Required when `enabled=true`; must be an absolute `https://` URL, or startup fails naming the property. A `keyReference` naming any other vault is refused — this is an allow-list anchor, not just a connection string. |
+| `sessionlayer.ca.azure.vault-uri` | string (URL) | none | The one vault this Control Plane signs in. Required when `enabled=true`; must be an absolute `https://` URL, or startup fails naming the property. A `keyReference` naming any other vault is refused - this is an allow-list anchor, not just a connection string. |
 | `sessionlayer.ca.azure.credential` | enum | `DEFAULT` | Which `azure-identity` credential builds the vault's token: `DEFAULT` (the standard Azure credential chain), `MANAGED_IDENTITY`, or `WORKLOAD_IDENTITY`. |
 | `sessionlayer.ca.azure.client-id` | string | none | Pins the managed/workload identity's client id, for a host with more than one attached. |
 | `sessionlayer.ca.azure.timeout` | duration | `PT10S` | The HTTP client's connection and response timeout on every call to the vault. The provisioning step of a rotation is bounded separately by `sessionlayer.ca.provision-timeout`. |

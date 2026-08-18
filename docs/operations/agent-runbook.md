@@ -125,7 +125,7 @@ cause:
 A node whose Agent is not connected shows as offline to users, the same
 generic post-authorization outcome as any unreachable node.
 
-## Alert: `ALL Gateway control channels are down — this node is UNREACHABLE`
+## Alert: `ALL Gateway control channels are down - this node is UNREACHABLE`
 
 Every diverse channel is gone at once, a broad outage or a misconfiguration
 hitting all endpoints. This is the documented degrade: the platform
@@ -216,7 +216,7 @@ status, seccomp syscall count, and the egress allow-list.
 A terminal identity outcome (exit 3 or 4) stops new dial-backs and closes
 the control channel, but live spliced sessions are real users mid-work: they
 drain up to `--drain-deadline-secs` (default 30) rather than being cut. The
-log line is `terminal identity outcome — refusing new sessions and draining
+log line is `terminal identity outcome - refusing new sessions and draining
 live ones`; the process exits 3 or 4 once the drain completes.
 
 ## Observability
