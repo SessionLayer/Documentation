@@ -135,7 +135,7 @@ volumes:
   pgdata: {}
   miniodata: {}
   state: {}
-  # The demo customer recording PRIVATE key — mounted only into `seed` and the
+  # The demo customer recording PRIVATE key - mounted only into `seed` and the
   # `decrypt` tool, never into the recorded node, the client, or the Gateway.
   # Production keeps this key offline entirely (docs/admin-guides/session-recording.md).
   customer-key: {}

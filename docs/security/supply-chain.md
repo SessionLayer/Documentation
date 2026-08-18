@@ -261,7 +261,7 @@ sha256sum trusted_root.json    # pin this digest in your config management
 
 > **Warning:** this command needs cosign **v3.0.4 or newer**, which is where
 > `--with-default-services` was added. Everything earlier rejects it outright
-> with `Error: unknown flag: --with-default-services` — being on the 3.x line
+> with `Error: unknown flag: --with-default-services` - being on the 3.x line
 > is not enough, since the flag only exists from 3.0.4 on.
 > On a version that has the flag, it is still required: without it, `cosign
 > trusted-root create` silently emits an empty stub
@@ -360,11 +360,11 @@ image ships. Should the two turn out to be the same build, that is a fact about
 how the image happens to be assembled, not a property anything checks.
 
 > **Warning:** the base image is a real precondition, not a formality, and
-> it is the one most easily missed — the remap rules address *paths*, and
+> it is the one most easily missed - the remap rules address *paths*, and
 > nothing in `RUSTFLAGS` normalizes the host C toolchain. Rebuilding the
 > Agent's release on Ubuntu 26.04 (glibc 2.43, gcc 15.2) with every other
-> precondition matched — same tagged commit, same pinned rustc 1.95.0, same
-> `SOURCE_DATE_EPOCH`, same `protoc` 3.21.12 — produces a **different**
+> precondition matched - same tagged commit, same pinned rustc 1.95.0, same
+> `SOURCE_DATE_EPOCH`, same `protoc` 3.21.12 - produces a **different**
 > digest, differing in `.text` (+10752 bytes) and `.comment`, the section
 > that carries the producer version string. The embedded rustc sysroot hash
 > is identical in both and neither binary contains a host path, so the
@@ -387,7 +387,7 @@ then `cargo build --release --locked --bin sessionlayer-agent`.
 > root specifically to prove reproducibility from a genuinely different
 > build directory, so the remap rule has to cover the alternate target
 > directory too (`Agent`/`Gateway` `release.yml`), not just the checkout
-> root — miss it, and that path escapes remapping and the two builds'
+> root - miss it, and that path escapes remapping and the two builds'
 > digests diverge.
 
 ## SBOMs

@@ -305,7 +305,7 @@ The `PUT` is a whole-set replace in one transaction, so the node is never
 briefly anchorless and never briefly still trusting the key you are
 retiring. Send at least one of `hostCertificate` or `pinnedHostKey`: an empty
 set is a `422`, because a node with no anchor does not fall back to
-trust-on-first-use, it stops working. A `removed` node is a `409` — removal
+trust-on-first-use, it stops working. A `removed` node is a `409` - removal
 is terminal, and such a host comes back as a fresh registration under a new
 name.
 

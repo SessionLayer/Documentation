@@ -620,7 +620,7 @@ the three together as one shape. A CA whose key lives in Key Vault has no wrappe
 all, so `V30` adds `key_location` (`local_kek`\|`external`, default `local_kek`) and replaces the
 three column-level CHECKs with one table-level CHECK keyed on it: `local_kek` requires exactly the
 `V12` shape, now enforced jointly rather than column-by-column; `external` requires all three
-`NULL`. `public_key` stays `NOT NULL` for both — an external CA's public key is resolved from the
+`NULL`. `public_key` stays `NOT NULL` for both - an external CA's public key is resolved from the
 key service at adoption and persisted, which is what keeps `CaPublicKeyService`,
 `CaRotationService.trustedCaKeys` and `LocalCaFactory.publicAuthorizedKey` working unchanged
 regardless of `key_location`. The write-once trigger (`V12`) gains `key_location` as a fourth

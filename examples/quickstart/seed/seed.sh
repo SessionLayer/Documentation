@@ -64,7 +64,7 @@ if [ ! -f "$STATE/gateway.json" ]; then
 	psql_q "INSERT INTO runtime.gateway_enrollment_token(id,token_hash,gateway_name,single_use,expires_at,created_by)
 	        VALUES (gen_random_uuid(),'$(sha_hex "$token")','gw-quickstart',true,now()+interval '2 hours','quickstart-seed')" >/dev/null
 	# require_https=false is DEV-ONLY: this stack's WORM store is an in-network
-	# plain-HTTP MinIO; the product default is true — keep it in production
+	# plain-HTTP MinIO; the product default is true - keep it in production
 	# (docs/reference/config-gateway.md). host_key_path persists the outer SSH
 	# host key in the data volume so clients can verify a stable front door.
 	cat > "$STATE/gateway.json" <<EOF

@@ -7,11 +7,11 @@ player's `src/crypto/slrec.ts` is the same mirror in the browser):
     header = "SLREC1" | alg(1) | reserved(1) | ephLen(u16 BE) | ephPub(SEC1) |
              wrapNonce(12) | wrapLen(u16 BE) | wrappedKey
     frame  = ctLen(u32 BE) | AES-256-GCM ciphertext (nonce = frame counter,
-             AAD = frame index — so a removed/reordered frame fails to decrypt)
+             AAD = frame index - so a removed/reordered frame fails to decrypt)
 
 The data key is unwrapped via ECIES: ECDH(customer private, ephemeral public)
 -> HKDF-SHA256 -> AES-256-GCM key unwrap. Only the holder of the customer
-PRIVATE key can do this — the platform stores the public half only and cannot
+PRIVATE key can do this - the platform stores the public half only and cannot
 decrypt its own recordings.
 
 Output: the original asciicast v2 bytes on stdout, or with --text just the
@@ -87,7 +87,7 @@ def unseal(obj: bytes, key_pem: bytes) -> bytes:
 
 def render_text(cast: bytes) -> str:
     # asciicast v2: a JSON header line, then [time, kind, data] events; "o" is
-    # terminal output ("i" is captured keystrokes — deliberately not echoed here).
+    # terminal output ("i" is captured keystrokes - deliberately not echoed here).
     out = []
     for line in cast.decode("utf-8", errors="replace").splitlines()[1:]:
         if not line:

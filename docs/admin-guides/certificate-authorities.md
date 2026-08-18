@@ -91,7 +91,7 @@ Anything else is rejected at validation with a `422`, before anything is
 stored, as is an algorithm the chosen backend cannot produce.
 
 > **Warning:** this makes the KEK load-bearing rather than optional for
-> whichever CAs remain on `local` — which is at minimum the internal mTLS CA,
+> whichever CAs remain on `local` - which is at minimum the internal mTLS CA,
 > since it cannot move (see below), and by default all three SSH CAs too. Each
 > such private key is in the Control Plane's database, envelope-encrypted
 > under the key-encryption key you supply in `sessionlayer.ca.local.kek-base64`.
@@ -193,8 +193,8 @@ for the credential options.
 > Plane, use a **user-assigned managed identity via Workload Identity
 > Federation**: no secret exists to leak or to rotate.
 
-Create (or choose) an EC P-256 key in the vault — `azure_keyvault` only ever
-signs P-256, whatever the CA's current algorithm is — and rotate the CA onto
+Create (or choose) an EC P-256 key in the vault - `azure_keyvault` only ever
+signs P-256, whatever the CA's current algorithm is - and rotate the CA onto
 its fully versioned identifier (`ca:rotate`):
 
 ```bash
@@ -211,7 +211,7 @@ curl -s -X POST https://cp.example.com/v1/cas/$CA_ID/rotate \
 ```
 
 Send `algorithm` explicitly whenever the CA you are adopting is not already
-`ecdsa-p256` — an omitted `algorithm` inherits the active CA's current one,
+`ecdsa-p256` - an omitted `algorithm` inherits the active CA's current one,
 and `ecdsa-p384`/`ecdsa-p521` are refused for this backend before anything is
 written.
 
@@ -242,7 +242,7 @@ against a real vault exists and is skipped without credentials, so validate
 this against your own vault before you depend on it.
 
 > **Warning:** the key version is mandatory and must be a real Key Vault
-> version — 32 lowercase hex characters — not merely present: a blank value
+> version - 32 lowercase hex characters - not merely present: a blank value
 > and a merely-plausible one like `v1` are both refused (`422`) before
 > anything is written. What makes the pin matter operationally: the signing
 > client is built from the exact identifier you name here, so a signature can
@@ -252,7 +252,7 @@ this against your own vault before you depend on it.
 > the signing key underneath a running CA, the Control Plane would start
 > emitting certificates no node trusts, with no error visible on the Control
 > Plane side. To move onto a genuinely new vault key later, rotate again
-> naming the new version explicitly — an empty-bodied rotate against a Key
+> naming the new version explicitly - an empty-bodied rotate against a Key
 > Vault CA re-adopts the exact version it already points to, which changes
 > nothing.
 

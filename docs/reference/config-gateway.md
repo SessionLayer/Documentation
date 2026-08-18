@@ -281,7 +281,7 @@ when diagnosing a node, and neither reads or needs a valid config file:
 | `gateway io-backend [--request epoll\|uring]` | Print which async-I/O reactor a request would actually resolve to, and exit. |
 | `gateway --version` | Print the version and supported protocol range. |
 
-`health` reports the component identity, build version, negotiable protocol range and a status —
+`health` reports the component identity, build version, negotiable protocol range and a status -
 useful as a container healthcheck or a first triage step, since it exercises none of the network
 surface:
 

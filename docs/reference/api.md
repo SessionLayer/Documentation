@@ -3,7 +3,7 @@
 The Control Plane exposes a contract-first REST API: the same surface the Dashboard uses. The
 authoritative contract is `contracts/openapi/openapi.yaml` in the ControlPlane repository
 (OpenAPI 3.1). Server interfaces and the Dashboard's typed client are both generated from it.
-This page restates the contract by hand, and nothing compares the two — if you change an
+This page restates the contract by hand, and nothing compares the two - if you change an
 operation, change both.
 
 > **Note:** three implemented routes sit outside the contract.
@@ -112,8 +112,8 @@ invalid configuration rejected before commit.
 > ```
 >
 > This covers an unknown enum value, malformed JSON, and a missing required
-> field alike. The status code and the `requestId` are reliable — correlate on
-> that — but do not parse `title`/`detail` from a `400`; they are absent. Every
+> field alike. The status code and the `requestId` are reliable - correlate on
+> that - but do not parse `title`/`detail` from a `400`; they are absent. Every
 > error raised by the application, including `403`, `404`, `409` and `422`, is a
 > genuine problem document.
 
@@ -180,7 +180,7 @@ Send `credential` (the printed value) and `subject` (the identity to make admin)
 plain `{"status": ...}` object rather than an RFC 9457 problem document, on every status code:
 `provisioned`, `already_completed`, `not_available` (no credential is armed), or
 `invalid_credential`. It is the one endpoint whose *success and application-level* responses
-deliberately avoid problem details, and the contract records that as an intentional exception —
+deliberately avoid problem details, and the contract records that as an intentional exception -
 distinct from the framework-level `400` shape described under [Errors](#errors), which applies
 everywhere.
 
